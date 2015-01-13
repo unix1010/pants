@@ -124,7 +124,7 @@ jar_library(name='scala-library',
 jar_library(name='scrooge-core',
             jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
-              jar(org='com.twitter', name='scrooge-core_2.9.2', rev='3.12.1').with_sources()
+              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.17.0').with_sources()
             ]
           )
 
@@ -192,10 +192,10 @@ jar_library(name='junit',
             ],
            )
 
-jar_library(name='specs_2.9',
+jar_library(name='specs_2.10',
             jars = [
               jar(org='org.scala-tools.testing', name='specs_2.10.3', rev='1.6.9')
             ]
            )
 
-jar_library(name='specs', dependencies = [ ':specs_2.9' ])
+jar_library(name='specs', dependencies = [ ':specs_2.10' ])
