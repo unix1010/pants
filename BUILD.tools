@@ -108,7 +108,7 @@ jar_library(name = 'scala-repl-2.10.3',
 
 jar_library(name = 'scalastyle',
             jars = [
-              jar(org='org.scalastyle', name='scalastyle_2.10.3', rev='0.3.2')
+              jar(org='org.scalastyle', name='scalastyle_2.10', rev='0.3.2')
             ])
 
 jar_library(name = 'scrooge-gen',
