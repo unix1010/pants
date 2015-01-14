@@ -46,11 +46,11 @@ jar_library(name='cucumber-java',
 )
 
 # common rev for all com.twitter%finagle* artifacts
-FINAGLE_REV = '6.8.1'
+FINAGLE_REV = '6.24.0'
 
 jar_library(name='finagle-core',
             jars = [
-              jar(org='com.twitter', name='finagle-core_2.9.2', rev=FINAGLE_REV)
+              jar(org='com.twitter', name='finagle-core_2.10', rev=FINAGLE_REV)
                 .with_sources(),
             ],
             dependencies = [
@@ -59,7 +59,7 @@ jar_library(name='finagle-core',
 
 jar_library(name='finagle-thrift',
             jars = [
-              jar(org='com.twitter', name='finagle-thrift_2.9.2', rev=FINAGLE_REV)
+              jar(org='com.twitter', name='finagle-thrift_2.10', rev=FINAGLE_REV)
             ])
 
 # common rev for all com.google.guava%guava* artifacts
@@ -130,7 +130,7 @@ jar_library(name='scrooge-core',
 
 jar_library(name='shapeless',
             jars=[
-              jar(org='com.chuusai', name='shapeless_2.9.2', rev='1.2.4'),
+              jar(org='com.chuusai', name='shapeless_2.10.4', rev='2.0.0'),
             ],
 )
 
@@ -169,11 +169,11 @@ jar_library(name='thrift',
             dependencies = [ ':thrift-0.5.0' ])
 
 # common rev for all com.twitter%util* artifacts
-UTIL_REV = '6.8.1'
+UTIL_REV = '6.23.0'
 
 jar_library(name='util-core',
             jars = [
-		    jar(org='com.twitter', name='util-core_2.9.2', rev=UTIL_REV).with_sources() ])
+		    jar(org='com.twitter', name='util-core_2.10', rev=UTIL_REV).with_sources() ])
 
 
 ###############
