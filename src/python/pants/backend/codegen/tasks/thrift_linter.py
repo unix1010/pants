@@ -43,7 +43,8 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # Linter depends on ivy running before it.
     round_manager.require_data('ivy_imports')
 
-  def _to_bool(self, value):
+  @staticmethod
+  def _to_bool(value):
     # Converts boolean and string values to boolean.
     return str(value) == 'True'
 
