@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from abc import abstractmethod
 import re
 
-from pants.base.deprecated import deprecated
+#from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.option.options import Options
 from pants.scm.scm import Scm
@@ -132,7 +132,8 @@ class ScmPublishMixin(object):
     super(ScmPublishMixin, cls).register_options(register)
     register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
              help='Try pushing the pushdb to the SCM this many times before aborting.')
-    register('--restrict-push-branches', advanced=True, type=Options.list,
+    register('--restrict-push-branches', #advanced=True,
+             type=Options.list,
              help='Allow pushes only from one of these branches.')
 
   @property
@@ -212,7 +213,7 @@ class ScmPublishMixin(object):
       raise scm_exception
 
 class ScmPublish(ScmPublishMixin):
-  @deprecated('0.0.30', hint_message='Use ScmPublishMixin instead.')
+  #@deprecated('0.0.30', hint_message='Use ScmPublishMixin instead.')
   def __init__(self, scm, restrict_push_branches):
     self._restrict_push_branches = frozenset(restrict_push_branches or ())
     self.scm = scm
