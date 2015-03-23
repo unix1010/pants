@@ -23,7 +23,7 @@ def dict_type(s):
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
   """
-  return _convert(s, (dict,))
+  return _convert(s, (dict,), dict)
 
 
 def list_type(s):
@@ -32,19 +32,20 @@ def list_type(s):
   The value (on the command-line, in an env var or in the config file) must be eval'able to a
   list or tuple.
   """
-  return _convert(s, (list, tuple))
+  return _convert(s, (list, tuple), tuple)
 
 
-def _convert(val, acceptable_types):
+def _convert(val, input_types, output_type):
   """Ensure that val is one of the acceptable types, converting it if needed."""
-  if isinstance(val, acceptable_types):
+  assert output_type in input_types
+  if isinstance(val, input_types):
     return val
   try:
     parsed_value = eval(val, {}, {})
   except Exception as e:
     raise _parse_error(val, 'Value cannot be evaluated: {msg}\n{value}'.format(
       msg=e.message, value=Config.format_raw_value(val)))
-  if not isinstance(parsed_value, acceptable_types):
+  if not isinstance(parsed_value, input_types):
     raise _parse_error(val, 'Value is not of the acceptable types: {msg}\n{value}'.format(
-      msg=acceptable_types, value=Config.format_raw_value(val)))
-  return parsed_value
+      msg=input_types, value=Config.format_raw_value(val)))
+  return output_type(parsed_value)
