@@ -23,7 +23,9 @@ To build a jar use:
 
     ./pants binary.dup --excludes="['rootdoc.txt']" zinc:bin
 
-To consume a jar change zinc target in BUILD.tools:
+Consuming a change in the zinc target via BUILD.tools (Currently, due to maven- versus ivy-style
+hierarchies, you cannot reconsume zinc in pants by simply changing the version; you must specify the
+jar directly):
 
     jar_library(name = 'zinc',
                 jars = [
@@ -32,9 +34,7 @@ To consume a jar change zinc target in BUILD.tools:
                 ],
                 dependencies=[
                   ':nailgun-server',
-                  '3rdparty/jvm/com/typesafe/sbt:compiler-interface',
                   '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
-                  '3rdparty/jvm/com/typesafe/sbt:sbt-interface',
                   '3rdparty:guava',
                   '3rdparty:jsr305',
                 ])
