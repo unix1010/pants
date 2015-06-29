@@ -96,10 +96,9 @@ class Scalastyle(NailgunTask):
 
     return scala_sources
 
-  def __init__(self, *args, **kwargs):
-    super(Scalastyle, self).__init__(*args, **kwargs)
-
-    self._results_dir = os.path.join(self.workdir, 'results')
+  @property
+  def _results_dir(self):
+    return os.path.join(self.workdir, 'results')
 
   def _create_result_file(self, target):
     result_file = os.path.join(self._results_dir, target.id)
@@ -117,9 +116,7 @@ class Scalastyle(NailgunTask):
       return
 
     with self.invalidated(targets) as invalidation_check:
-      invalid_targets = []
-      for vt in invalidation_check.invalid_vts:
-        invalid_targets.extend(vt.targets)
+      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
 
       scalastyle_config = self.validate_scalastyle_config()
       scalastyle_excluder = self.create_file_excluder()
@@ -146,8 +143,8 @@ class Scalastyle(NailgunTask):
             entry=Scalastyle._MAIN, exit_code=result))
 
         if self.artifact_cache_writes_enabled():
-          result_files = lambda vt: map(lambda t: self._create_result_file(t), vt.targets)
-          pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+          pairs = [(vt, [self._create_result_file(vt.target)])
+                   for vt in invalidation_check.invalid_vts]
           self.update_artifact_cache(pairs)
 
   def validate_scalastyle_config(self):

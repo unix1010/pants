@@ -45,10 +45,9 @@ class Checkstyle(NailgunTask):
     super(Checkstyle, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
 
-  def __init__(self, *args, **kwargs):
-    super(Checkstyle, self).__init__(*args, **kwargs)
-
-    self._results_dir = os.path.join(self.workdir, 'results')
+  @property
+  def _results_dir(self):
+    return os.path.join(self.workdir, 'results')
 
   def _is_checked(self, target):
     return (isinstance(target, Target) and
@@ -65,9 +64,7 @@ class Checkstyle(NailgunTask):
       return
     targets = self.context.targets(self._is_checked)
     with self.invalidated(targets) as invalidation_check:
-      invalid_targets = []
-      for vt in invalidation_check.invalid_vts:
-        invalid_targets.extend(vt.targets)
+      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       sources = self.calculate_sources(invalid_targets)
       if sources:
         result = self.checkstyle(targets, sources)
@@ -76,8 +73,8 @@ class Checkstyle(NailgunTask):
             main=self._CHECKSTYLE_MAIN, result=result))
 
         if self.artifact_cache_writes_enabled():
-          result_files = lambda vt: map(lambda t: self._create_result_file(t), vt.targets)
-          pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+          pairs = [(vt, [self._create_result_file(vt.target)])
+                   for vt in invalidation_check.invalid_vts]
           self.update_artifact_cache(pairs)
 
   def calculate_sources(self, targets):
