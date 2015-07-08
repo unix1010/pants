@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import xml.etree.ElementTree as ET
+from contextlib import closing, contextmanager, nested
 from textwrap import dedent
 
 from mock import Mock
@@ -268,61 +269,63 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def test_symlink_cachepath(self):
     self.maxDiff = None
-    with temporary_dir() as mock_cache_dir:
-      with temporary_dir() as symlink_dir:
-        with temporary_dir() as classpath_dir:
-          input_path = os.path.join(classpath_dir, 'inpath')
-          output_path = os.path.join(classpath_dir, 'classpath')
-          existing_symlink_map = {}
-          foo_path = os.path.join(mock_cache_dir, 'foo.jar')
-          with open(foo_path, 'w') as foo:
-            foo.write("test jar contents")
+    with nested(temporary_dir(), temporary_dir()) as (mock_cache_dir, buildroot):
+      with nested(temporary_dir(root_dir=buildroot), temporary_dir()) as (abs_symlink_dir, classpath_dir):
+        input_path = os.path.join(classpath_dir, 'inpath')
+        output_path = os.path.join(classpath_dir, 'classpath')
+        symlink_dir = os.path.relpath(abs_symlink_dir, buildroot)
+        existing_symlink_map = {}
+        foo_path = os.path.join(mock_cache_dir, 'foo.jar')
+        with open(foo_path, 'w') as foo:
+          foo.write("test jar contents")
 
-          with open(input_path, 'w') as inpath:
-            inpath.write(foo_path)
-          result_map = IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path, existing_symlink_map)
-          symlink_foo_path = os.path.join(symlink_dir, 'foo.jar')
-          self.assertEquals(
-            {
-              os.path.realpath(foo_path) : symlink_foo_path
-            },
-            result_map)
-          with open(output_path, 'r') as outpath:
-            self.assertEquals(symlink_foo_path, outpath.readline())
-          self.assertTrue(os.path.islink(symlink_foo_path))
-          self.assertTrue(os.path.exists(symlink_foo_path))
+        with open(input_path, 'w') as inpath:
+          inpath.write(foo_path)
+        result_map = IvyUtils.symlink_cachepath(buildroot, mock_cache_dir, input_path,
+                                                abs_symlink_dir,
+                                                output_path, existing_symlink_map)
+        symlink_foo_path = os.path.join(symlink_dir, 'foo.jar')
+        self.assertEquals(
+          {
+            os.path.realpath(foo_path) : symlink_foo_path
+          },
+          result_map)
+        with open(output_path, 'r') as outpath:
+          self.assertEquals(symlink_foo_path, outpath.readline())
+        self.assertTrue(os.path.islink(symlink_foo_path))
+        self.assertTrue(os.path.exists(symlink_foo_path))
 
-          # Now add an additional path to the existing map
-          bar_path = os.path.join(mock_cache_dir, 'bar.jar')
-          with open(bar_path, 'w') as bar:
-            bar.write("test jar contents2")
-          with open(input_path, 'w') as inpath:
-            inpath.write(os.pathsep.join([foo_path, bar_path]))
-          existing_symlink_map = result_map
-          result_map = IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path, existing_symlink_map)
-          symlink_bar_path = os.path.join(symlink_dir, 'bar.jar')
-          self.assertEquals(
-            {
-              os.path.realpath(foo_path) : symlink_foo_path,
-              os.path.realpath(bar_path) : symlink_bar_path,
-            },
-            result_map)
-          with open(output_path, 'r') as outpath:
-            self.assertEquals(symlink_foo_path + os.pathsep + symlink_bar_path, outpath.readline())
-          self.assertTrue(os.path.islink(symlink_foo_path))
-          self.assertTrue(os.path.exists(symlink_foo_path))
-          self.assertTrue(os.path.islink(symlink_bar_path))
-          self.assertTrue(os.path.exists(symlink_bar_path))
+        # Now add an additional path to the existing map
+        bar_path = os.path.join(mock_cache_dir, 'bar.jar')
+        with open(bar_path, 'w') as bar:
+          bar.write("test jar contents2")
+        with open(input_path, 'w') as inpath:
+          inpath.write(os.pathsep.join([foo_path, bar_path]))
+        existing_symlink_map = result_map
+        result_map = IvyUtils.symlink_cachepath(buildroot, mock_cache_dir, input_path,
+                                                abs_symlink_dir,
+                                                output_path, existing_symlink_map)
+        symlink_bar_path = os.path.join(symlink_dir, 'bar.jar')
+        self.assertEquals(
+          {
+            os.path.realpath(foo_path) : symlink_foo_path,
+            os.path.realpath(bar_path) : symlink_bar_path,
+          },
+          result_map)
+        with open(output_path, 'r') as outpath:
+          self.assertEquals(symlink_foo_path + os.pathsep + symlink_bar_path, outpath.readline())
+        self.assertTrue(os.path.islink(symlink_foo_path))
+        self.assertTrue(os.path.exists(symlink_foo_path))
+        self.assertTrue(os.path.islink(symlink_bar_path))
+        self.assertTrue(os.path.exists(symlink_bar_path))
 
-          # Reverse the ordering and make sure order is preserved in the output path
-          with open(input_path, 'w') as inpath:
-            inpath.write(os.pathsep.join([bar_path, foo_path]))
-          IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path, result_map)
-          with open(output_path, 'r') as outpath:
-            self.assertEquals(symlink_bar_path + os.pathsep + symlink_foo_path, outpath.readline())
+        # Reverse the ordering and make sure order is preserved in the output path
+        with open(input_path, 'w') as inpath:
+          inpath.write(os.pathsep.join([bar_path, foo_path]))
+        IvyUtils.symlink_cachepath(buildroot, mock_cache_dir, input_path, abs_symlink_dir,
+                                   output_path, result_map)
+        with open(output_path, 'r') as outpath:
+          self.assertEquals(symlink_bar_path + os.pathsep + symlink_foo_path, outpath.readline())
 
   def test_missing_ivy_report(self):
     self.set_options_for_scope(IvySubsystem.options_scope, cache_dir='DOES_NOT_EXIST', use_nailgun=False)
