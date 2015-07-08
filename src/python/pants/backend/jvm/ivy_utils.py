@@ -203,7 +203,9 @@ class IvyUtils(object):
 
   @classmethod
   def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
-    """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
+    """Symlinks all paths listed in inpath into symlink_dir.
+
+    Requires that all paths begin with `ivy_cache_dir`.
 
     If there is an existing symlink for a file under inpath, it is used rather than creating
     a new symlink. Preserves all other paths. Writes the resulting paths to outpath.

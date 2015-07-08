@@ -63,6 +63,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     """
     if self.nailgun_is_enabled:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
+      print(">>> classpath for nailgun is: {}".format(classpath))
       client = NailgunExecutor(self._executor_workdir, classpath, distribution=self._dist)
     else:
       client = SubprocessExecutor(self._dist)

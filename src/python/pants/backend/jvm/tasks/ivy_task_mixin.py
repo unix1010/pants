@@ -167,7 +167,7 @@ class IvyTaskMixin(object):
       else:
         logger.debug("Using previously resolved reports: {}".format(report_paths))
 
-    # Make our actual classpath be symlinks, so that the paths are uniform across systems.
+    # Make our classpath entries into symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
     with IvyTaskMixin.symlink_map_lock:
@@ -180,6 +180,7 @@ class IvyTaskMixin(object):
         target_classpath_file,
         existing_symlinks_map)
       existing_symlinks_map.update(symlink_map)
+      print(">>> symlinked {} to update {}".format(symlink_map, existing_symlinks_map))
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
