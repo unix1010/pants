@@ -17,6 +17,7 @@ from twitter.common.collections import maybe_list
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.build_environment import get_buildroot
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
@@ -174,13 +175,13 @@ class IvyTaskMixin(object):
       products = self.context.products
       existing_symlinks_map = products.get_data('ivy_resolve_symlink_map', lambda: dict())
       symlink_map = IvyUtils.symlink_cachepath(
+        get_buildroot(),
         IvySubsystem.global_instance().get_options().cache_dir,
         raw_target_classpath_file,
         symlink_dir,
         target_classpath_file,
         existing_symlinks_map)
       existing_symlinks_map.update(symlink_map)
-      print(">>> symlinked {} to update {}".format(symlink_map, existing_symlinks_map))
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]

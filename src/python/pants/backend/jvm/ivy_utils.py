@@ -202,7 +202,7 @@ class IvyUtils(object):
     return diff_map
 
   @classmethod
-  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
+  def symlink_cachepath(cls, buildroot, ivy_cache_dir, inpath, abs_symlink_dir, outpath, existing_symlink_map):
     """Symlinks all paths listed in inpath into symlink_dir.
 
     Requires that all paths begin with `ivy_cache_dir`.
@@ -211,7 +211,10 @@ class IvyUtils(object):
     a new symlink. Preserves all other paths. Writes the resulting paths to outpath.
     Returns a map of path -> symlink to that path.
     """
-    safe_mkdir(symlink_dir)
+
+    safe_mkdir(abs_symlink_dir)
+    symlink_dir = os.path.relpath(abs_symlink_dir, buildroot)
+
     # The ivy_cache_dir might itself be a symlink. In this case, ivy may return paths that
     # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
     # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
@@ -222,11 +225,12 @@ class IvyUtils(object):
       paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
-      if path.startswith(real_ivy_cache_dir):
-        updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
-      else:
-        # This path is outside the cache. We won't symlink it.
-        updated_symlink_map[path] = path
+      if not path.startswith(real_ivy_cache_dir):
+        raise TaskError(
+            "Ivy is incorrectly configured: resolved item "
+            "{} was not located in cache dir {}.".format(path, real_ivy_cache_dir)
+        )
+      updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
 
     # Create symlinks for paths in the ivy cache dir that we haven't seen before.
     new_symlinks = cls._find_new_symlinks(existing_symlink_map, updated_symlink_map)
