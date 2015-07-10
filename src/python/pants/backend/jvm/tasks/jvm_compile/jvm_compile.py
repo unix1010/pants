@@ -180,7 +180,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     return []
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, all_compile_contexts=None, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
 
     # JVM options for running the compiler.
@@ -206,6 +206,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._strategy = strategy_constructor(self.context,
                                           self.get_options(),
                                           self.workdir,
+                                          all_compile_contexts,
                                           self.create_analysis_tools(),
                                           self._language,
                                           lambda s: s.endswith(self._file_suffix))
