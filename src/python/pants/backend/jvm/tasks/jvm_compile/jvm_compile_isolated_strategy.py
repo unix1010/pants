@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 import shutil
 from collections import OrderedDict, defaultdict
 
@@ -48,8 +47,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     self._worker_count = worker_count
     self._worker_pool = None
-
-    self._stamp_pattern = re.compile('[0-9]+')
 
   def name(self):
     return 'isolated'
@@ -255,52 +252,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
           self._analysis_dir, compile_context.target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, compile_context.analysis_file)
-
-  def invalid_vts_predicate(self, cached_vt):
-    """Confirms that the 'binary dep' stamps for this artifact match upstream products.
-
-    TODO: When we retrieve an artifact from the cache, it is based on our own fingerprint as well
-    as upstream fingerprints. Assuming deterministic outputs, any artifact with the same input
-    fingerprint is identical. But zinc does not create deterministic output timestamps for inputs,
-    so this is a fixup task to ignore artifacts that would cause timestamp mismatches for otherwise
-    identical classfiles.
-
-    Returns True to discard, or False to indicate that the artifact is valid.
-    """
-    for target in cached_vt.targets:
-      cc = self.compile_context(target)
-      analysis_class = self._analysis_parser.parse_from_path(cc.analysis_file)
-      if not hasattr(analysis_class, '_underlying_analysis'):
-        # zinc isn't in use. TODO: clean this up.
-        continue
-      analysis = analysis_class._underlying_analysis
-      for binary_dep, stamps in analysis.stamps.binaries.items():
-        if not binary_dep.endswith(".class"):
-          continue
-        classfile = binary_dep
-        # `stamps` is a list of strings like 'lastModified(1432758309000)'... the contract
-        # of the zinc analysis parser is that we get exactly one.
-        if len(stamps) != 1:
-          self.context.log.warn('Invalid stamps in artifact for {}: {}'.format(cached_vt, stamps))
-          return True
-        match = self._stamp_pattern.search(stamps[0])
-        if not match:
-          self.context.log.warn('Invalid stamps in artifact for {}: {}'.format(cached_vt, stamps))
-          return True
-        analysis_timestamp = int(match.group(0))
-
-        # also get the upstream classfile timestamp
-        if not os.path.exists(classfile):
-          self.context.log.warn('Missing upstream classfile for {}: {}'.format(cached_vt, classfile))
-          return True
-        classfile_mtime_millis = 1000 * int(os.stat(classfile).st_mtime)
-
-        # Compare timestamps from the analysis and classfiles.
-        if analysis_timestamp != classfile_mtime_millis:
-          self.context.log.warn(
-              'Stamp mismatch in artifact for {} for {}; rebuilding.'.format(cached_vt, binary_dep))
-          return True
-    return False
 
   def _write_to_artifact_cache(self, vts, compile_context, get_update_artifact_cache_work):
     assert len(vts.targets) == 1

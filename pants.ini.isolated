@@ -3,8 +3,6 @@
 
 [compile.apt]
 strategy: isolated
-read_artifact_caches: ['%(buildroot)s/.buildcache']
-write_artifact_caches: ['%(buildroot)s/.buildcache']
 
 
 [compile.zinc-java]
@@ -33,8 +31,6 @@ no_warning_args: [
     '-C-Xlint:none',
     '-C-nowarn',
   ]
-read_artifact_caches: ['%(buildroot)s/.buildcache']
-write_artifact_caches: ['%(buildroot)s/.buildcache']
 
 
 [compile.scala]
@@ -64,5 +60,3 @@ warning_args: [
 no_warning_args: [
     '-S-nowarn',
   ]
-read_artifact_caches: ['%(buildroot)s/.buildcache']
-write_artifact_caches: ['%(buildroot)s/.buildcache']
