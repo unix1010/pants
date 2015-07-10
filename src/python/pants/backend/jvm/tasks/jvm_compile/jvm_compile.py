@@ -52,6 +52,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
+    # TODO: Made unnecessary by https://rbcommons.com/s/twitter/r/2452/
+    register('--check-stamps', default=False, action='store_true',
+             advanced=True,
+             help='When set, cache entries will be checked for mismatched timestamps before use.')
+
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')
 
@@ -316,7 +321,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
-    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
+    invalid_vts_predicate = None
+    if self.get_options().check_stamps:
+      invalid_vts_predicate = lambda vt: self._strategy.invalid_vts_predicate(vt)
+    return self.do_check_artifact_cache(vts,
+                                        post_process_cached_vts=post_process_cached_vts,
+                                        invalid_vts_predicate=invalid_vts_predicate)
 
   def _create_empty_products(self):
     make_products = lambda: defaultdict(MultipleRootedProducts)
