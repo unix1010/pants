@@ -40,7 +40,7 @@ class ProcessGroup(object):
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.name, pid=process.pid, process_name=process.name)
+    return ProcessManager(name=process.cmdline[0], pid=process.pid, process_name=process.cmdline[0])
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
@@ -74,32 +74,25 @@ class ProcessManager(object):
 
   @property
   def name(self):
-    """The logical name/label of the process."""
     return self._name
 
   @property
+  def exe(self):
+    try:
+      return self.as_process().cmdline[0]
+    except AssertionError:
+      return None
+
+  @property
   def process_name(self):
-    """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
     return self._process_name
 
   @property
-  def exe(self):
-    """The full path of the process executable e.g. '/opt/java/jdk1.7.0/Contents/Home/bin/java'."""
-    return getattr(self.as_process(), 'exe', None)
-
-  @property
-  def exe_name(self):
-    """The basename of the process executable e.g. 'java'."""
-    return getattr(self.as_process(), 'name', None)
-
-  @property
   def pid(self):
-    """The running processes pid (or None)."""
     return self._pid or self.get_pid()
 
   @property
   def socket(self):
-    """The running processes socket/port information (or None)."""
     return self._socket or self.get_socket()
 
   @staticmethod
@@ -110,11 +103,9 @@ class ProcessManager(object):
       return x
 
   def as_process(self):
-    if self._process is None and self.pid:
-      try:
-        self._process = psutil.Process(self.pid)
-      except psutil.NoSuchProcess:
-        pass
+    assert self.is_alive(), 'cannot get process for a non-running process'
+    if not self._process:
+      self._process = psutil.Process(self.pid)
     return self._process
 
   def _read_file(self, filename):
@@ -200,20 +191,10 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
-  def is_alive(self):
+  def is_alive(self, pid=None):
     """Return a boolean indicating whether the process is running."""
-    if self.as_process():
-      try:
-        if (self.as_process().status == psutil.STATUS_ZOMBIE or           # Check for walkers.
-            (self.process_name and self.process_name != self.exe_name)):  # Check for stale pids.
-          return False
-      except psutil.NoSuchProcess:
-        # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
-        return False
-
-      return True
-    else:
-      return False
+    return psutil.pid_exists(pid or self.pid)
+    # TODO: consider stale pidfile case and assertion of self.process_name == proc.cmdline[0]
 
   def kill(self, kill_sig):
     """Send a signal to the current process."""
