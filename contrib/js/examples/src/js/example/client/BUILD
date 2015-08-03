@@ -6,9 +6,3 @@ js_library(
   ],
   resources=rglobs('src/*.css')
 )
-
-npm_module(
-  name='client-binary',
-  entry='main.jsx',
-  dependencies=[':client']
-)

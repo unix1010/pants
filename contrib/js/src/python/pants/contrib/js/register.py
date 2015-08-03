@@ -16,7 +16,7 @@ class JsLibrary(Target):
     super(JsLibrary, self).__init__(*args, **kwargs)
 
 class NpmModule(Target):
-  def __init__(self, entry=None, *args, **kwargs):
+  def __init__(self, main=None, *args, **kwargs):
     # TODO: payload
     super(NpmModule, self).__init__(*args, **kwargs)
 
