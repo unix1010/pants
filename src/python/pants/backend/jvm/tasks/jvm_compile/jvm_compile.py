@@ -195,7 +195,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     return []
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, all_compile_contexts=None, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
     self._targets_to_compile_settings = None
 
@@ -212,6 +212,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._confs = self.get_options().confs
 
     # The compile strategy to use for analysis and classfile placement.
+    # Note that using two different strategies at the same time is unsupported and may not work.
     if self.get_options().strategy == 'global':
       strategy_constructor = JvmCompileGlobalStrategy
     else:
@@ -220,6 +221,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._strategy = strategy_constructor(self.context,
                                           self.get_options(),
                                           self.workdir,
+                                          all_compile_contexts,
                                           self.create_analysis_tools(),
                                           self._language,
                                           lambda s: s.endswith(self._file_suffix))
