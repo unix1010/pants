@@ -1,5 +1,6 @@
 npm_module(
   name='client',
+  version='1.2.3',
   dependencies=[
     'contrib/npm/examples/3rdparty/js/react',
     'contrib/npm/examples/src/js/example/ui'
