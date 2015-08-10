@@ -1,5 +1,6 @@
 npm_module(
   name='client',
+  version='0.0.1',
   main='main.jsx',
   dependencies=[':client'],
   description='''

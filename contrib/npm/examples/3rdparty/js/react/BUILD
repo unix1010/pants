@@ -1,1 +1,1 @@
-npm_remote_module(name='react', rev='0.13')
+npm_remote_module(name='react', version='0.13')

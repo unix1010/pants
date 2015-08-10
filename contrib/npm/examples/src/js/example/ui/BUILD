@@ -1,5 +1,6 @@
 npm_module(
   name='ui',
+  version='1.0.0',
   dependencies=[
     'contrib/npm/examples/3rdparty/js/react',
     'contrib/npm/examples/src/js/scribe/client'
