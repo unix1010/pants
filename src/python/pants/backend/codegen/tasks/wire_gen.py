@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
+
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)
@@ -49,7 +50,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
 
   @classmethod
   def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy,]
+    return [cls.IsolatedCodegenStrategy]
 
   def sources_generated_by_target(self, target):
     genfiles = []

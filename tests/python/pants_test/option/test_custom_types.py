@@ -12,6 +12,7 @@ from pants.option.errors import ParseError
 
 
 class CustomTypesTest(unittest.TestCase):
+
   def _do_test(self, expected_val, s):
     if isinstance(expected_val, dict):
       val = dict_type(s)
@@ -32,13 +33,13 @@ class CustomTypesTest(unittest.TestCase):
 
   def test_dict(self):
     self._do_test({}, '{}')
-    self._do_test({ 'a': 'b' }, '{ "a": "b" }')
-    self._do_test({ 'a': 'b' }, "{ 'a': 'b' }")
-    self._do_test({ 'a': [1, 2, 3] }, '{ "a": [1, 2, 3] }')
-    self._do_test({ 'a': [1, 2, 3, 4] }, '{ "a": [1, 2] + [3, 4] }')
+    self._do_test({'a': 'b'}, '{ "a": "b" }')
+    self._do_test({'a': 'b'}, "{ 'a': 'b' }")
+    self._do_test({'a': [1, 2, 3]}, '{ "a": [1, 2, 3] }')
+    self._do_test({'a': [1, 2, 3, 4]}, '{ "a": [1, 2] + [3, 4] }')
     self._do_test({}, {})
-    self._do_test({ 'a': 'b' }, { 'a': 'b' })
-    self._do_test({ 'a': [1, 2, 3] }, { 'a': [1, 2, 3] })
+    self._do_test({'a': 'b'}, {'a': 'b'})
+    self._do_test({'a': [1, 2, 3]}, {'a': [1, 2, 3]})
     self._do_test_dict_error('[]')
     self._do_test_dict_error('[1, 2, 3]')
     self._do_test_dict_error('1')

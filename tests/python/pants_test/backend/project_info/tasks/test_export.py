@@ -30,6 +30,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ProjectInfoTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return Export
@@ -161,7 +162,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/x/*.py',]},
+      {'globs': ['src/x/*.py']},
       result['targets']['src/x:x']['globs']
     )
 
@@ -197,7 +198,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['project_info/com/foo/*.scala']},
+      {'globs': ['project_info/com/foo/*.scala']},
       result['targets']['project_info:globular']['globs']
     )
 
@@ -325,9 +326,9 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/exclude/*.py',],
-       'exclude' : [{
-         'globs' : ['src/exclude/foo.py']
+      {'globs': ['src/exclude/*.py'],
+       'exclude': [{
+         'globs': ['src/exclude/foo.py']
        }],
      },
       result['targets']['src/exclude:exclude']['globs']
@@ -340,7 +341,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/**/*.py','src/y/*.py',]},
+      {'globs': ['src/y/**/*.py', 'src/y/*.py']},
       result['targets']['src/y:y']['globs']
     )
 
@@ -351,7 +352,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/subdir/**/*.py', 'src/y/subdir/*.py',]},
+      {'globs': ['src/y/subdir/**/*.py', 'src/y/subdir/*.py']},
       result['targets']['src/y:y2']['globs']
     )
 
@@ -362,7 +363,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/Test*.py',]},
+      {'globs': ['src/y/Test*.py']},
       result['targets']['src/y:y3']['globs']
     )
 
@@ -373,7 +374,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/z/**/*.py',]},
+      {'globs': ['src/z/**/*.py']},
       result['targets']['src/z:z']['globs']
     )
 

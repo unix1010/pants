@@ -15,6 +15,7 @@ from pants.scm.scm import Scm
 
 
 class Version(object):
+
   @staticmethod
   def parse(version):
     """Attempts to parse the given string as Semver, then falls back to Namedver."""
@@ -61,6 +62,7 @@ class Namedver(Version):
 
 
 class Semver(Version):
+
   @staticmethod
   def parse(version):
     components = version.split('.', 3)
@@ -218,7 +220,7 @@ class ScmPublishMixin(object):
       try:
         log.debug("Trying scm push")
         scm.push()
-        break # success
+        break  # success
       except Scm.RemoteException as scm_exception:
         log.debug("Scm push failed, trying to refresh.")
         # This might fail in the event that there is a real conflict, throwing

@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class IvyModuleRef(object):
+
   def __init__(self, org, name, rev):
     self.org = org
     self.name = name
@@ -62,6 +63,7 @@ class IvyModuleRef(object):
 
 
 class IvyInfo(object):
+
   def __init__(self):
     self.modules_by_ref = {}  # Map from ref to referenced module.
     # Map from ref of caller to refs of modules required by that caller.
@@ -126,6 +128,7 @@ class IvyInfo(object):
     :rtype: list of IvyArtifact
     """
     artifacts = OrderedSet()
+
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
@@ -148,6 +151,7 @@ class IvyInfo(object):
     """
 
     ref = IvyModuleRef(jar.org, jar.name, jar.rev)
+
     def create_collection(dep):
       s = OrderedSet()
       if ref != dep:
@@ -365,7 +369,7 @@ class IvyUtils(object):
         module=name,
         version='latest.integration',
         publications=None,
-        configurations=maybe_list(confs), # Mustache doesn't like sets.
+        configurations=maybe_list(confs),  # Mustache doesn't like sets.
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)

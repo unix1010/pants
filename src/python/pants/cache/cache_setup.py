@@ -21,11 +21,18 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class EmptyCacheSpecError(ArtifactCacheError): pass
-class LocalCacheSpecRequiredError(ArtifactCacheError): pass
-class CacheSpecFormatError(ArtifactCacheError): pass
-class InvalidCacheSpecError(ArtifactCacheError): pass
-class RemoteCacheSpecRequiredError(ArtifactCacheError): pass
 
+
+class LocalCacheSpecRequiredError(ArtifactCacheError): pass
+
+
+class CacheSpecFormatError(ArtifactCacheError): pass
+
+
+class InvalidCacheSpecError(ArtifactCacheError): pass
+
+
+class RemoteCacheSpecRequiredError(ArtifactCacheError): pass
 
 
 class CacheSetup(Subsystem):
@@ -61,6 +68,7 @@ class CacheSetup(Subsystem):
 
 
 class CacheFactory(object):
+
   def __init__(self, options, log, stable_name, pinger=None):
     self._options = options
     self._log = log
