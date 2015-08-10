@@ -1,3 +1,3 @@
-js_library(
+npm_module(
   name='client',
 )

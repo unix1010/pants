@@ -1,8 +1,10 @@
-js_library(
+npm_module(
   name='client',
   dependencies=[
     'contrib/npm/examples/3rdparty/js/react',
     'contrib/npm/examples/src/js/example/ui'
   ],
-  resources=rglobs('src/*.css')
+  resources=[
+    'contrib/npm/examples/src/resources/example/ui',
+  ],
 )

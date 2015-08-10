@@ -1,8 +1,10 @@
-js_library(
+npm_module(
   name='ui',
   dependencies=[
     'contrib/npm/examples/3rdparty/js/react',
     'contrib/npm/examples/src/js/scribe/client'
   ],
-  resources=['contrib/npm/examples/src/js/example/ui'],
+  resources=[
+    'contrib/npm/examples/src/js/example/ui',
+  ],
 )

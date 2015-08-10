@@ -10,13 +10,8 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
-class JsLibrary(Target):
-  def __init__(self, resources=None, *args, **kwargs):
-    # TODO: payload
-    super(JsLibrary, self).__init__(*args, **kwargs)
-
 class NpmModule(Target):
-  def __init__(self, main=None, *args, **kwargs):
+  def __init__(self, main=None, resources=None, *args, **kwargs):
     # TODO: payload
     super(NpmModule, self).__init__(*args, **kwargs)
 
@@ -29,7 +24,6 @@ class NpmRemoteModule(Target):
 def build_file_aliases():
   return BuildFileAliases.create(
     targets={
-      'js_library': JsLibrary,
       'npm_module': NpmModule,
       'npm_remote_module': NpmRemoteModule,
     },
