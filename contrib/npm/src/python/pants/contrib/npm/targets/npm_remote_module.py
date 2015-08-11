@@ -6,11 +6,20 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
 
 
 class NpmRemoteModule(Target):
-  def __init__(self, version=None, *args, **kwargs):
-    super(NpmRemoteModule, self).__init__(*args, **kwargs)
+  """Represents the name and version of a remote npm module existing in an npm repository."""
+
+  def __init__(self, name=None, version=None, *args, **kwargs):
+    payload = Payload()
+    payload.add_fields({
+      'version': PrimitiveField(version),
+      'name': PrimitiveField(name)
+    })
+    super(NpmRemoteModule, self).__init__(name=name, *args, **kwargs)
     if not version:
       raise TargetDefinitionException(self, "The `version` argument is required, and should specify a semantic version.")
