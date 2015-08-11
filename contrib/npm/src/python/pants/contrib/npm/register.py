@@ -6,23 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.exceptions import TargetDefinitionException
-from pants.base.target import Target
 from pants.goal.task_registrar import TaskRegistrar as task
 
-
-class NpmModule(Target):
-  def __init__(self, version=None, main=None, resources=None, *args, **kwargs):
-    super(NpmModule, self).__init__(*args, **kwargs)
-    if not version:
-      raise TargetDefinitionException(self, "The `version` argument is required, and should specify a semantic version.")
-
-
-class NpmRemoteModule(Target):
-  def __init__(self, version=None, *args, **kwargs):
-    super(NpmRemoteModule, self).__init__(*args, **kwargs)
-    if not version:
-      raise TargetDefinitionException(self, "The `version` argument is required, and should specify a semantic version.")
+from pants.contrib.npm.targets.npm_module import NpmModule
+from pants.contrib.npm.targets.npm_remote_module import NpmRemoteModule
 
 
 def build_file_aliases():

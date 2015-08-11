@@ -1,9 +1,8 @@
 python_library(
   name='js',
   dependencies=[
+    'contrib/npm/src/python/pants/contrib/npm/targets',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:target',
   ],
   sources=globs('*.py'),
 )
