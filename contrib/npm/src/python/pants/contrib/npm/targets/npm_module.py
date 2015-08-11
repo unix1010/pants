@@ -5,20 +5,23 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-from glob import glob
-
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
+from pants.contrib.npm.subsystems.npm_subsystem import NpmSubsystem
 
 
 class NpmModule(Target):
+  """Represents a set of local javascript sources and resources with a synthetic package.json."""
+
+  @classmethod
+  def subsystems(cls):
+    return super(NpmModule, cls).subsystems() + (NpmSubsystem,)
+
   # TODO: add support for resources; currently ignored
   def __init__(self, address=None, version=None, main=None, resources=None, **kwargs):
-    # TODO: define glob patterns in the subsystem
-    sources = glob(os.path.join(address.spec_path, '*.js'))
+    sources = NpmSubsystem.global_instance().source_globs(address)
     payload = Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources=sources,

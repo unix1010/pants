@@ -9,10 +9,15 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
+from pants.contrib.npm.subsystems.npm_subsystem import NpmSubsystem
 
 
 class NpmRemoteModule(Target):
   """Represents the name and version of a remote npm module existing in an npm repository."""
+
+  @classmethod
+  def subsystems(cls):
+    return super(NpmRemoteModule, cls).subsystems() + (NpmSubsystem,)
 
   def __init__(self, name=None, version=None, *args, **kwargs):
     payload = Payload()

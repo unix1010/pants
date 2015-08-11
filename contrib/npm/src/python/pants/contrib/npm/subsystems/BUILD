@@ -1,0 +1,10 @@
+python_library(
+  name='subsystems',
+  sources=globs('*.py'),
+  dependencies=[
+    'src/python/pants/backend/core:wrapped_globs',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:memo',
+  ],
+)
