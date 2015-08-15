@@ -168,19 +168,14 @@ object Compiler {
  */
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
-  /**
-   * Run a compile. The resulting analysis is also cached in memory.
-   *
-   *  Note:  This variant automatically contructs an error-reporter.
-   */
-  def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Unit = {
     val progress =
       new SimpleCompileProgress(
         setup.consoleLog.logPhases,
         setup.consoleLog.printProgress,
         setup.consoleLog.heartbeatSecs
       )(log)
-    val reporter = new LoggerReporter(maxErrors = 100, log, identity)
+    val reporter = new LoggerReporter(maximumErrors = 100, log, identity)
     compile(inputs, cwd, reporter, Some(progress))(log)
   }
 
@@ -225,8 +220,8 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
       )(log)
 
     // if the compile resulted in modified, analysis persist it
-    if (result.modified) {
-      targetAnalysisStore.set(result.analysis)
+    if (result.hasModified) {
+      targetAnalysisStore.set(result.analysis, result.setup)
     }
   }
 

@@ -2,7 +2,7 @@ scala_library(
   name='inc',
   provides=artifact(
     org='org.pantsbuild',
-    name='zinc-sbt-internal',
+    name='zinc-sbt-inc',
     repo=public,
     publication_metadata=pants_library('Temporary shims to expose accidentally-private SBT apis.')
   ),

@@ -6,7 +6,7 @@ package sbt.inc
 /**
  * TODO: A temporary class in the `sbt.inc` package to deal with the fact that
  * `Analysis.empty` is accidentally package-protected in sbt 0.13.9. Remove after:
- *   TODO issue #
+ *   https://github.com/sbt/sbt/issues/2159
  */
 @deprecated("Temporary class used to work around an accidentally package-protected method.", "0.13.9")
 object ZincPrivateAnalysis {

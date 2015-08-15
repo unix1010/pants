@@ -6,7 +6,7 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList, Map => JMap }
-import sbt.{ CompileSetup, Logger }
+import sbt.Logger
 import sbt.Path._
 import sbt.compiler.IC
 import sbt.inc.{ Analysis, Locate, ZincPrivateAnalysis }
