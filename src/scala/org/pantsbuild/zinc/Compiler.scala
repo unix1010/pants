@@ -8,7 +8,7 @@ import java.io.File
 import java.net.URLClassLoader
 import sbt.compiler.javac
 import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, Logger, LoggerReporter, ScalaInstance }
-import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, CompileOutput, IC }
+import sbt.compiler.{ AnalyzingCompiler, CompilerCache, CompileOutput, IC }
 import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
@@ -206,7 +206,6 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
     val getAnalysis: File => Option[Analysis] = analysisMap.get
-    val aggressive    = new AggressiveCompile(cacheFile)
     val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath)
     val compileOutput = CompileOutput(classesDirectory)
     val globalsCache  = Compiler.residentCache
@@ -215,7 +214,27 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
     val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder, incOpts.nameHashing)
     val analysisStore = Compiler.analysisStore(cacheFile)
 
-    aggressive.compile1(sources, cp, compileSetup, progress, analysisStore, getAnalysis, definesClass, scalac, javac, reporter, skip, globalsCache, incOpts)(log)
+    val result =
+      IC.incrementalCompile(
+        scalac,
+        javac,
+        sources,
+        cp,
+        compileOutput,
+        globalsCache,
+        progress,
+        ???, // scalac opts
+        ???, // javac opts
+        ???, // previousAnalysis
+        ???, // previousSetup
+        getAnalysis,
+        definesClass,
+        reporter,
+        ???, // compileOrder
+        skip,
+        incOpts
+      )(log)
+    result.analysis
   }
 
   /**
