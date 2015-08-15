@@ -9,7 +9,7 @@ import java.net.URLClassLoader
 import sbt.compiler.javac
 import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, Logger, LoggerReporter, ScalaInstance }
 import sbt.compiler.{ AnalyzingCompiler, CompilerCache, CompileOutput, MixedAnalyzingCompiler, IC }
-import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
+import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore, ZincPrivateAnalysis }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 
@@ -119,12 +119,6 @@ object Compiler {
     cachedAnalysisStore(cacheFile).get map (_._1)
 
   /**
-   * Analysis for the given file, or Analysis.Empty if it is not in the cache.
-   */
-  def analysisFor(cacheFile: File): Analysis =
-    analysisOptionFor(cacheFile) getOrElse Analysis.Empty
-
-  /**
    * Check whether an analysis is empty.
    */
   def analysisIsEmpty(cacheFile: File): Boolean =
@@ -176,65 +170,64 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
-   *  Note:  This variant automatically contructs an error-reporter.
-   */
-  def compile(inputs: Inputs)(log: Logger): Analysis = compile(inputs, None)(log)
-
-  /**
-   * Run a compile. The resulting analysis is also cached in memory.
    *
    *  Note:  This variant automatically contructs an error-reporter.
    */
   def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
-    val maxErrors     = 100
-    compile(inputs, cwd, new LoggerReporter(maxErrors, log, identity))(log)
+    val progress =
+      new SimpleCompileProgress(
+        setup.consoleLog.logPhases,
+        setup.consoleLog.printProgress,
+        setup.consoleLog.heartbeatSecs
+      )(log)
+    val reporter = new LoggerReporter(maxErrors = 100, log, identity)
+    compile(inputs, cwd, reporter, Some(progress))(log)
   }
 
   /**
-   * Run a compile. The resulting analysis is also cached in memory.
-   *
-   *  Note: This variant does not report progress updates
+   * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
    */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
-    val progress = Some(new SimpleCompileProgress(setup.consoleLog.logPhases, setup.consoleLog.printProgress, setup.consoleLog.heartbeatSecs)(log))
-    compile(inputs, cwd, reporter, progress)(log)
-  }
-
-  /**
-   * Run a compile. The resulting analysis is also cached in memory.
-   */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: Logger): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: Logger): Unit = {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) {
       Util.cleanAllClasses(classesDirectory)
     }
 
+    // load the existing analysis
+    // TODO: differentiate output analysis from input analysis
+    val targetAnalysisStore = Compiler.cachedAnalysisStore(cacheFile)
     val (previousAnalysis, previousSetup) =
-      Compiler.cachedAnalysisStore(cacheFile).get().map {
+      targetAnalysisStore.get().map {
         case (a, s) => (a, Some(s))
       } getOrElse {
-        (Analysis.Empty, None)
+        (ZincPrivateAnalysis.empty(incOptions.nameHashing), None)
       }
 
-    IC.incrementalCompile(
-      scalac,
-      javac,
-      sources,
-      classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath),
-      output = CompileOutput(classesDirectory),
-      cache = Compiler.residentCache,
-      progress,
-      options = scalacOptions,
-      javacOptions,
-      previousAnalysis,
-      previousSetup,
-      analysisMap = analysisMap.get,
-      definesClass,
-      reporter,
-      compileOrder,
-      skip = false,
-      incOptions.options
-    )(log).analysis
+    val result =
+      IC.incrementalCompile(
+        scalac,
+        javac,
+        sources,
+        classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath),
+        output = CompileOutput(classesDirectory),
+        cache = Compiler.residentCache,
+        progress,
+        options = scalacOptions,
+        javacOptions,
+        previousAnalysis,
+        previousSetup,
+        analysisMap = analysisMap.get,
+        definesClass,
+        reporter,
+        compileOrder,
+        skip = false,
+        incOptions.options
+      )(log)
+
+    // if the compile resulted in modified, analysis persist it
+    if (result.modified) {
+      targetAnalysisStore.set(result.analysis)
+    }
   }
 
   /**
