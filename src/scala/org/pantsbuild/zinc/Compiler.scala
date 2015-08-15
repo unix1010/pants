@@ -8,7 +8,7 @@ import java.io.File
 import java.net.URLClassLoader
 import sbt.compiler.javac
 import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, Logger, LoggerReporter, ScalaInstance }
-import sbt.compiler.{ AnalyzingCompiler, CompilerCache, CompileOutput, IC }
+import sbt.compiler.{ AnalyzingCompiler, CompilerCache, CompileOutput, MixedAnalyzingCompiler, IC }
 import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
@@ -89,8 +89,10 @@ object Compiler {
 
   /**
    * Create an analysis store backed by analysisCache.
+   *
+   * TODO: for all but the "output" analysis, the synchronization is overkill; everything upstream is immutable
    */
-  def analysisStore(cacheFile: File): AnalysisStore = {
+  def cachedAnalysisStore(cacheFile: File): AnalysisStore = {
     val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
 
     val fprintStore = new AnalysisStore {
@@ -113,21 +115,20 @@ object Compiler {
   /**
    * Analysis for the given file if it is already cached.
    */
-  def analysisOption(cacheFile: File): Option[Analysis] =
-    analysisStore(cacheFile).get map (_._1)
+  def analysisOptionFor(cacheFile: File): Option[Analysis] =
+    cachedAnalysisStore(cacheFile).get map (_._1)
 
   /**
    * Analysis for the given file, or Analysis.Empty if it is not in the cache.
    */
-  def analysis(cacheFile: File): Analysis =
-    analysisOption(cacheFile) getOrElse Analysis.Empty
+  def analysisFor(cacheFile: File): Analysis =
+    analysisOptionFor(cacheFile) getOrElse Analysis.Empty
 
   /**
    * Check whether an analysis is empty.
    */
-  def analysisIsEmpty(cacheFile: File): Boolean = {
-    analysis(cacheFile) eq Analysis.Empty
-  }
+  def analysisIsEmpty(cacheFile: File): Boolean =
+    analysisOptionFor(cacheFile).isEmpty
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.
@@ -208,8 +209,12 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
       Util.cleanAllClasses(classesDirectory)
     }
 
-    // TODO
-    val analysisStore = Compiler.analysisStore(cacheFile)
+    val (previousAnalysis, previousSetup) =
+      Compiler.cachedAnalysisStore(cacheFile).get().map {
+        case (a, s) => (a, Some(s))
+      } getOrElse {
+        (Analysis.Empty, None)
+      }
 
     IC.incrementalCompile(
       scalac,
@@ -221,8 +226,8 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
       progress,
       options = scalacOptions,
       javacOptions,
-      ???, // previousAnalysis
-      ???, // previousSetup
+      previousAnalysis,
+      previousSetup,
       analysisMap = analysisMap.get,
       definesClass,
       reporter,
