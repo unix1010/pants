@@ -75,14 +75,14 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.8')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = 'stuhood-1441400864')
             ])
 
-SBT_REV = '0.13.9'
+SBT_REV = '0.13.10-stuhood-java-invalidation-repro-1441395942'
 
 jar_library(name = 'compiler-interface',
             jars = [
-              jar(org = 'com.typesafe.sbt', name = 'compiler-interface', rev = SBT_REV,
+              jar(org = 'org.scala-sbt', name = 'compiler-interface', rev = SBT_REV,
                   classifier='sources',
                   # We just want the single compiler-interface jar and not its dep on scala-lang
                   intransitive=True)
@@ -90,7 +90,7 @@ jar_library(name = 'compiler-interface',
 
 jar_library(name = 'sbt-interface',
             jars = [
-              jar(org = 'com.typesafe.sbt', name = 'sbt-interface', rev = SBT_REV,
+              jar(org = 'org.scala-sbt', name = 'interface', rev = SBT_REV,
                   # We just want the single sbt-interface jar and not its dep on scala-lang
                   intransitive=True)
             ])
