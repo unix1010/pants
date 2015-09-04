@@ -11,6 +11,7 @@ import sbt.Path._
 import sbt.compiler.IC
 import sbt.inc.{ Analysis, Locate, ZincPrivateAnalysis }
 import scala.collection.JavaConverters._
+import xsbti.ClassRef
 import xsbti.compile.CompileOrder
 
 /**
@@ -25,7 +26,7 @@ case class Inputs(
   cacheFile: File,
   analysisMap: Map[File, Analysis],
   forceClean: Boolean,
-  definesClass: File => String => Boolean,
+  definesClass: File => String => Option[ClassRef],
   javaOnly: Boolean,
   compileOrder: CompileOrder,
   incOptions: IncOptions)
@@ -50,15 +51,6 @@ object Inputs {
       compileOrder,
       incOptions)
   }
-
-  /** An overridden definesClass to use analysis for an input directory if it is available. */
-  def definesClass(log: Logger, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
-    analysisMap.get(entry).map { analysis =>
-      log.debug(s"Hit analysis cache for class definitions with ${entry}")
-      (s: String) => analysis.relations.definesClass(s).nonEmpty
-    }.getOrElse {
-      Locate.definesClass(entry)
-    }
 
   /**
    * Create normalised and defaulted Inputs.
@@ -101,7 +93,7 @@ object Inputs {
       }.toMap
     val incOpts          = updateIncOptions(incOptions, classesDirectory, normalise)
     new Inputs(
-      cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, definesClass(log, validUpstreamAnalysis, _),
+      cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass,
       javaOnly, compileOrder, incOpts
     )
   }
