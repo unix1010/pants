@@ -12,7 +12,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
   <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
   <property name="m2.repo.artifact"
-            value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
+            value="${m2.repo.relpath}/[artifact]-[revision](-[classifier]).[ext]"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
 
   <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
