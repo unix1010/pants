@@ -15,7 +15,6 @@ skip: True
 
 [compile.zinc]
 name_hashing: True
-capture_log: True
 strategy: isolated
 worker_count: 4
 jvm_options: [
