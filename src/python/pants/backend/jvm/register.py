@@ -10,6 +10,7 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
+from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
@@ -55,7 +56,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       'annotation_processor': AnnotationProcessor,
       'benchmark': Benchmark,
@@ -86,6 +87,10 @@ def build_file_aliases():
       'jar_rules': JarRules,
       'Repository': Repository,
       'Skip': Skip,
+      'shading_relocate': Shading.Relocate.new,
+      'shading_exclude': Shading.Exclude.new,
+      'shading_relocate_package': Shading.RelocatePackage.new,
+      'shading_exclude_package': Shading.ExcludePackage.new,
     },
     context_aware_object_factories={
       'bundle': Bundle.factory,

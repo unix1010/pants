@@ -420,7 +420,14 @@ def get_syms(build_file_parser):
         syms[sym] = item
 
   aliases = build_file_parser.registered_aliases()
-  map_symbols(aliases.targets)
+  map_symbols(aliases.target_types)
+
+  # TODO(John Sirois): Handle mapping the `Macro.expand` arguments - these are the real arguments
+  # to document and may be different than the set gathered from walking the Target hierarchy.
+  for alias, target_macro_factory in aliases.target_macro_factories.items():
+    for target_type in target_macro_factory.target_types:
+      map_symbols({alias: target_type})
+
   map_symbols(aliases.objects)
   map_symbols(aliases.context_aware_object_factories)
   return syms
@@ -454,9 +461,10 @@ def oref_template_data_from_help_info(oschi):
       hlp = indent_docstring_by_n(sub_buildroot(ohi.help), 6)
     option_l.append(TemplateData(
       st=st,
+      fromfile=ohi.fromfile,
       default=sub_buildroot(ohi.default),
       hlp=hlp,
-      typ=ohi.type.__name__))
+      typ=ohi.typ.__name__))
   return TemplateData(
     title=title,
     options=option_l,
