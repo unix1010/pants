@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
@@ -20,6 +21,11 @@ class JvmCompileStrategy(object):
   """An abstract base strategy for JVM compilation."""
 
   __metaclass__ = ABCMeta
+
+  # TODO: make actual NamedTuple classes for these
+  CRL = 'crl({})'
+  CRL_RE = re.compile('crl\(([^)]*)\)')
+
   # Common code.
   # ------------
 
@@ -138,12 +144,18 @@ class JvmCompileStrategy(object):
     """Executed once after all targets have been compiled."""
     pass
 
-  def class_name_for_class_file(self, compile_context, class_file_name):
-    if not class_file_name.endswith(".class"):
-      return None
-    assert class_file_name.startswith(compile_context.classes_dir)
-    class_file_name = class_file_name[len(compile_context.classes_dir) + 1:-len(".class")]
-    return class_file_name.replace("/", ".")
+  def class_for_class_ref(self, compile_context, class_ref):
+    """Return a tuple of filename and class name."""
+    match = self.CRL_RE.match(class_ref)
+    assert match, ("Unexpected class reference: {}".format(class_ref))
+    file_name = match.group(1)
+    assert file_name.startswith(compile_context.classes_dir)
+    # is a resource
+    if not file_name.endswith(".class"):
+      return file_name, None
+    # is a class
+    slashed_class_name = file_name[len(compile_context.classes_dir) + 1:-len(".class")]
+    return file_name, slashed_class_name.replace("/", ".")
 
   def _compute_sources_by_target(self, targets):
     """Computes and returns a map target->sources (relative to buildroot)."""

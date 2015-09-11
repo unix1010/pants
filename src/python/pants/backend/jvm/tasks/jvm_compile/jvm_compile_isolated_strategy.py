@@ -146,7 +146,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       unclaimed_classes = set()
       with compile_context.open_jar(mode='r') as jar:
         for name in jar.namelist():
-          unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
+          unclaimed_classes.add(self.CRL.format(os.path.join(compile_context.classes_dir, name)))
 
       # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
