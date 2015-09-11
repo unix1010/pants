@@ -12,12 +12,15 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
   <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
   <property name="m2.repo.artifact"
-            value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
+            value="${m2.repo.relpath}/[artifact]-[revision](-[classifier]).[ext]"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
 
   <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
   <property name="android.repo.dir" value="${env.ANDROID_HOME}/extras/android/m2repository"/>
   <property name="google.repo.dir" value="${env.ANDROID_HOME}/extras/google/m2repository"/>
+
+  <property name="typesafe.ivy.url" value="https://repo.typesafe.com/typesafe/ivy-releases"/>
+
   <resolvers>
 
     <chain name="pants-chain-repos" returnFirst="true">
@@ -26,6 +29,12 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
            to confusing failures later when classpaths are constructed and used.
            We setup the maven central resolver to require successful pom downloads here. -->
       <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
+
+      <!-- typesafe's dumb ivy repo: only useful for testing pre-release versions of sbt -->
+      <url name="typesafe">
+        <ivy pattern="${typesafe.ivy.url}/[organisation]/[module]/[revision]/[type]s/[artifact](-[classifier]).[ext]"/>
+        <artifact pattern="${typesafe.ivy.url}/[organisation]/[module]/[revision]/[type]s/[artifact](-[classifier]).[ext]"/>
+      </url>
 
       <!-- Android SDK Support Library, found in reference to the ANDROID_HOME variable. -->
       <ibiblio name="local.android"
