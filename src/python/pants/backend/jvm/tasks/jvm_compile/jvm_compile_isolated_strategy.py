@@ -54,9 +54,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
+    # TODO: rename
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
     self._logs_dir = os.path.join(workdir, 'isolated-logs')
-    self._jars_dir = os.path.join(workdir, 'jars')
 
     self._capture_log = options.capture_log
 
@@ -76,14 +76,10 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def compile_context(self, target):
     analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_dir, target)
-    classes_dir = os.path.join(self._classes_dir, target.id)
-    # Generate a short unique path for the jar to allow for shorter classpaths.
-    #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
-    jar_file = os.path.join(self._jars_dir, '{}.jar'.format(sha1(target.id).hexdigest()[:12]))
+    classes_dir = os.path.join(self._classes_dir, '{}.jar'.format(target.id))
     return IsolatedCompileContext(target,
                                   analysis_file,
                                   classes_dir,
-                                  jar_file,
                                   self._sources_for_target(target))
 
   def _create_compile_contexts_for_targets(self, targets):
@@ -98,7 +94,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._logs_dir)
-    safe_mkdir(self._jars_dir)
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
@@ -110,7 +105,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     with self.context.new_workunit('validate-{}-analysis'.format(self._compile_task_name)):
       for target in relevant_targets:
         cc = self.compile_context(target)
-        safe_mkdir(cc.classes_dir)
         compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
         self.validate_analysis(cc.analysis_file)
 
@@ -123,15 +117,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       self._worker_pool = WorkerPool(workunit.parent,
                                      self.context.run_tracker,
                                      self._worker_count)
-
-  def finalize_compile(self, targets):
-    # Replace the classpath entry for each target with its jar'd representation.
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    for target in targets:
-      cc = self.compile_context(target)
-      for conf in self._confs:
-        compile_classpaths.remove_for_target(target, [(conf, cc.classes_dir)])
-        compile_classpaths.add_for_target(target, [(conf, cc.jar_file)])
 
   def invalidation_hints(self, relevant_targets):
     # No partitioning.
@@ -146,7 +131,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       unclaimed_classes = set()
       with compile_context.open_jar(mode='r') as jar:
         for name in jar.namelist():
-          unclaimed_classes.add(self.CRL.format(os.path.join(compile_context.classes_dir, name)))
+          unclaimed_classes.add(self.CRJ.format(compile_context.classes_dir, name))
 
       # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
@@ -179,12 +164,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       compile_contexts_by_directory[compile_context.classes_dir] = compile_context
     # If we have a compile context for the target, include it.
     for entry in classpath_entries:
-      if not entry.endswith('.jar'):
-        compile_context = compile_contexts_by_directory.get(entry)
-        if not compile_context:
-          self.context.log.debug('Missing upstream analysis for {}'.format(entry))
-        else:
-          yield compile_context.classes_dir, compile_context.analysis_file
+      compile_context = compile_contexts_by_directory.get(entry)
+      if compile_context:
+        yield compile_context.classes_dir, compile_context.analysis_file
 
   def _capture_log_file(self, target):
     if self._capture_log:
@@ -229,9 +211,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                     progress_message,
                     target.platform)
         atomic_copy(tmp_analysis_file, compile_context.analysis_file)
-
-        # Jar the compiled output.
-        self._create_context_jar(compile_context)
 
         # Update the products with the latest classes.
         register_vts([compile_context])
@@ -318,22 +297,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
           self._analysis_dir, compile_context.target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, compile_context.analysis_file)
-
-  def _create_context_jar(self, compile_context):
-    """Jar up the compile_context to its output jar location.
-
-    TODO(stuhood): In the medium term, we hope to add compiler support for this step, which would
-    allow the jars to be used as compile _inputs_ as well. Currently using jar'd compile outputs as
-    compile inputs would make the compiler's analysis useless.
-      see https://github.com/twitter-forks/sbt/tree/stuhood/output-jars
-    """
-    root = compile_context.classes_dir
-    with compile_context.open_jar(mode='w') as jar:
-      for abs_sub_dir, _, filenames in safe_walk(root):
-        for name in filenames:
-          abs_filename = os.path.join(abs_sub_dir, name)
-          arcname = os.path.relpath(abs_filename, root)
-          jar.write(abs_filename, arcname)
 
   def _write_to_artifact_cache(self, vts, compile_context, get_update_artifact_cache_work):
     assert len(vts.targets) == 1

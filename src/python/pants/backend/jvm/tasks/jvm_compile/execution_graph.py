@@ -262,6 +262,7 @@ class ExecutionGraph(object):
           work()
           result = (worker_key, SUCCESSFUL, None)
         except Exception as e:
+          log.error(traceback.format_exc())
           result = (worker_key, FAILED, e)
         finished_queue.put(result)
         jobs_in_flight.decrement()
