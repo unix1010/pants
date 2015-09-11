@@ -9,6 +9,10 @@ strategy: isolated
 use_jmake: False
 
 
+[compile.jvm-dep-check]
+skip: True
+
+
 [compile.zinc]
 name_hashing: True
 strategy: isolated

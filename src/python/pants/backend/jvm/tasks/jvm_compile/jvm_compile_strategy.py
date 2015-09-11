@@ -14,7 +14,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_rmtree
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree
 
 
 class JvmCompileStrategy(object):
@@ -25,7 +25,7 @@ class JvmCompileStrategy(object):
   # TODO: make actual NamedTuple classes for these
   CRL = 'crl({})'
   CRJ = 'crj({}!{})'
-  CRL_RE = re.compile('crl\(([^)]*)\)')
+  CR_RE = re.compile('cr([lj])\(([^!)]*)!?([^)]*)?\)')
 
   # Common code.
   # ------------
@@ -146,14 +146,22 @@ class JvmCompileStrategy(object):
     pass
 
   def class_for_class_ref(self, compile_context, class_ref):
-    """Return a tuple of filename and class name."""
-    match = self.CRL_RE.match(class_ref)
+    """Return a tuple of relative filename and class name."""
+    match = self.CR_RE.match(class_ref)
     assert match, ("Unexpected class reference: {}".format(class_ref))
-    file_name = match.group(1)
-    assert file_name.startswith(compile_context.classes_dir)
+    if match.group(1) == 'j':
+      # jarred
+      assert match.group(2).startswith(compile_context.classes_dir)
+      file_name = match.group(3)
+    else:
+      # loose
+      assert match.group(1) == 'l', ("Unexpected class reference: {}".format(class_ref))
+      file_name = fast_relpath(match.group(2))
+
     # is a resource
     if not file_name.endswith(".class"):
       return file_name, None
+
     # is a class
     slashed_class_name = file_name[len(compile_context.classes_dir) + 1:-len(".class")]
     return file_name, slashed_class_name.replace("/", ".")

@@ -364,16 +364,15 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       def add_products_by_target(files):
         for f in files:
-          classfile, clsname = self._strategy.class_for_class_ref(compile_context, f)
+          rel_file, clsname = self._strategy.class_for_class_ref(compile_context, f)
           if clsname:
             # Is a class.
-            classes_by_target[target].add_abs_paths(classes_dir, [classfile])
+            classes_by_target[target].add_rel_paths(classes_dir, [rel_file])
             resources = resource_mapping.get(clsname, [])
             resources_by_target[target].add_abs_paths(classes_dir, resources)
           else:
             # Is a resource.
-            assert "TODO: Need to differentiate resources."
-            resources_by_target[target].add_abs_paths(classes_dir, [f])
+            resources_by_target[target].add_rel_paths(classes_dir, [rel_file])
 
       # Collect classfiles (absolute) that were claimed by sources (relative)
       for source in compile_context.sources:
