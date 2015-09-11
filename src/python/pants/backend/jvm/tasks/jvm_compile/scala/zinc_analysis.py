@@ -32,7 +32,7 @@ class ZincAnalysis(Analysis):
     ./pants test tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala:zinc_analysis
   """
 
-  FORMAT_VERSION_LINE = UnderlyingAnalysis.FORMAT_VERSION_LINE
+  FORMAT_VERSION_LINE = UnderlyingAnalysis.FORMAT_VERSION_LINE = b'format version: 6\n'
 
   @classmethod
   def merge(cls, analyses):

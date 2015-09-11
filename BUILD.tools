@@ -73,12 +73,12 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
                 intransitive = True,
               )])
 
-#SBT_REV = '0.13.10-stuhood-java-invalidation-repro-1441940355'
-SBT_REV = '0.13.9'
+SBT_REV = '0.13.10-stuhood-java-invalidation-repro-1441940355'
+#SBT_REV = '0.13.9'
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.8'),
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = 'stuhood-1441943668'),
             ])
 
 jar_library(name = 'compiler-interface',
