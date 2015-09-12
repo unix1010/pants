@@ -156,7 +156,7 @@ class JvmCompileStrategy(object):
     else:
       # loose
       assert match.group(1) == 'l', ("Unexpected class reference: {}".format(class_ref))
-      file_name = fast_relpath(match.group(2))
+      file_name = fast_relpath(match.group(2), compile_context.classes_dir)
 
     # is a resource
     if not file_name.endswith(".class"):
