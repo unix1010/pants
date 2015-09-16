@@ -5,7 +5,7 @@ SBT_REV = '0.13.10-stuhood-java-invalidation-repro-1442185262'
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = 'stuhood-1442185414')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = 'stuhood-1442443684')
             ])
 
 jar_library(name = 'compiler-interface',
