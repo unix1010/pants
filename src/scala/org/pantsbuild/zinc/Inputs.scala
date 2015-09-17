@@ -12,7 +12,6 @@ import sbt.Path._
 import sbt.compiler.IC
 import sbt.inc.{ Analysis, ZincPrivateAnalysis }
 import scala.collection.JavaConverters._
-import xsbti.ClassRef
 import xsbti.compile.CompileOrder
 
 /**
