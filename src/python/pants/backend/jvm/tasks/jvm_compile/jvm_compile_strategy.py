@@ -25,7 +25,7 @@ class JvmCompileStrategy(object):
   # TODO: make actual NamedTuple classes for these
   CRL = 'crl({})'
   CRJ = 'crj({}!{})'
-  CR_RE = re.compile('cr([lj])\(([^!)]*)!?([^)]*)?\)')
+  CR_RE = re.compile(r'cr([lj])\(([^!)]*)!?([^)]*)?\)')
 
   # Common code.
   # ------------
