@@ -21,7 +21,7 @@ import sbt.compiler.{
   IC,
   MixedAnalyzingCompiler
 }
-import sbt.inc.ZincPrivateAnalysis
+import sbt.inc.{ Locate, ZincPrivateAnalysis }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 
@@ -177,7 +177,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
         previousAnalysis,
         previousSetup,
         analysisMap = analysisMap.getAnalysis,
-        definesClass = analysisMap.definesClass,
+        definesClass = Locate.definesClass,
         reporter,
         compileOrder,
         skip = false,
