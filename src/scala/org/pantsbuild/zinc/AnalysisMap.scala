@@ -17,8 +17,7 @@ import sbt.{
 import sbt.inc.{
   Analysis,
   AnalysisStore,
-  FileBasedStore,
-  Locate
+  FileBasedStore
 }
 
 import org.pantsbuild.zinc.cache.Cache
@@ -43,7 +42,7 @@ case class AnalysisMap private[AnalysisMap] (
    * cache location and then checking the cache.
    */
   def getAnalysis(classpathEntry: File): Option[Analysis] =
-    analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get)
+    analysisLocations.get(classpathEntry).flatMap(AnalysisMap.getAnalysis)
 }
 
 object AnalysisMap {
@@ -66,13 +65,13 @@ object AnalysisMap {
       }
     )
 
-  private def get(cacheFPrint: FileFPrint): Option[Analysis] =
-    analysisCache.getOrElseUpdate(cacheFPrint) {
+  private def getAnalysis(analysisFPrint: FileFPrint): Option[Analysis] =
+    analysisCache.getOrElseUpdate(analysisFPrint) {
       // re-fingerprint the file on miss, to ensure that analysis hasn't changed since we started
-      if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
-        throw new IOException(s"Analysis at $cacheFPrint has changed since startup!")
+      if (!FileFPrint.fprint(analysisFPrint.file).exists(_ == analysisFPrint)) {
+        throw new IOException(s"Analysis at $analysisFPrint has changed since startup!")
       }
-      FileBasedStore(cacheFPrint.file).get
+      FileBasedStore(analysisFPrint.file).get
     }.map(_._1)
 
   /**

@@ -14,6 +14,7 @@ import sbt.{
   LoggerReporter,
   ScalaInstance
 }
+import sbt.classpath.ClasspathUtilities
 import sbt.compiler.{
   AnalyzingCompiler,
   CompileOutput,
@@ -23,6 +24,7 @@ import sbt.compiler.{
 }
 import sbt.inc.{ Locate, ZincPrivateAnalysis }
 import sbt.Path._
+import xsbti.FileRef
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 
 import org.pantsbuild.zinc.cache.Cache
@@ -41,6 +43,12 @@ object Compiler {
    * Static cache for resident scala compilers.
    */
   private val residentCache: GlobalsCache = createResidentCache(Setup.Defaults.residentCacheLimit)
+
+  /**
+   * Static cache of the names contained in jars.
+   */
+  private val jarCache =
+    Cache[FileFPrint, String=>Option[FileRef]](Setup.Defaults.jarCacheLimit)
 
   /**
    * Get or create a zinc compiler based on compiler setup.
@@ -101,6 +109,25 @@ object Compiler {
   def createResidentCache(maxCompilers: Int): GlobalsCache = {
     if (maxCompilers <= 0) CompilerCache.fresh else CompilerCache(maxCompilers)
   }
+
+  /**
+   * A clone of Locate.definesClass that caches the entries contained in jars.
+   */
+  def definesClass(entry: File): String => Option[FileRef] =
+    if (entry.isDirectory) {
+      Locate.directoryDefinesClass(entry)
+    } else if (entry.exists && ClasspathUtilities.isArchive(entry, contentFallback = true)) {
+      // use the cache if possible
+      FileFPrint.fprint(entry).map { fprint =>
+        jarCache.getOrElseUpdate(fprint) {
+          Locate.jarDefinesClass(entry)
+        }
+      }.getOrElse {
+        Locate.jarDefinesClass(entry)
+      }
+    } else {
+      Function.const(None)
+    }
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.
@@ -177,7 +204,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
         previousAnalysis,
         previousSetup,
         analysisMap = analysisMap.getAnalysis,
-        definesClass = Locate.definesClass,
+        definesClass = Compiler.definesClass,
         reporter,
         compileOrder,
         skip = false,
