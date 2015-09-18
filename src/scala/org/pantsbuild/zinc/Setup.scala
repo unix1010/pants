@@ -171,10 +171,10 @@ object Setup {
     val defaultScalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
     val scalaExcluded        = Util.stringSetProperty(prop("scala.excluded"), defaultScalaExcluded)
 
-    val cacheLimit         = Util.intProperty(prop("cache.limit"), 5)
-    val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
-    val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
+    val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), 32)
+    val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), 8)
     val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), 0)
+    val jarCacheLimit = Util.intProperty(prop("jar.cache.limit"), 128)
   }
 
   def prop(name: String) = Command + "." + name
