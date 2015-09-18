@@ -158,6 +158,8 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
       targetAnalysisStore.get().map {
         case (a, s) => (a, Some(s))
       } getOrElse {
+        // clean the output location and initialize the analysis
+        Util.cleanAllClasses(classesDirectory)
         (ZincPrivateAnalysis.empty(incOptions.nameHashing), None)
       }
 
