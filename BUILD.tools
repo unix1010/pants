@@ -1,11 +1,11 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-SBT_REV = '0.13.10-stuhood-java-invalidation-repro-1442521365'
+SBT_REV = '0.13.10-stuhood-java-invalidation-repro-1442607336'
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = 'stuhood-1442598282')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = 'stuhood-1442609361')
             ])
 
 jar_library(name = 'compiler-interface',

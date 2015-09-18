@@ -19,8 +19,9 @@ strategy: isolated
 worker_count: 4
 jvm_options: [
     '-Xmx4g', '-XX:MaxPermSize=512m', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4',
-    # bigger cache size for our big projects (default is just 5)
+    # increase cache sizes to account for larger classpaths
     '-Dzinc.analysis.cache.limit=1000',
+    '-Dzinc.jar.cache.limit=3000',
   ]
 
 args: [
