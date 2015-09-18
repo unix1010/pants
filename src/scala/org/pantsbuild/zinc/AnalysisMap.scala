@@ -12,13 +12,18 @@ import java.io.{
 
 import sbt.{
   CompileSetup,
-  Logger
+  IO
 }
 import sbt.inc.{
   Analysis,
   AnalysisStore,
   FileBasedStore,
   Locate
+}
+import xsbti.{
+  FileRef,
+  FileRefJarred,
+  FileRefLoose
 }
 
 import org.pantsbuild.zinc.cache.Cache
@@ -38,6 +43,23 @@ case class AnalysisMap private[AnalysisMap] (
   // a map of classpath entries to cache file fingerprints, excluding the current compile destination
   analysisLocations: Map[File, FileFPrint]
 ) {
+  /**
+   * An implementation of definesClass that will use analysis for an input directory to determine
+   * whether it defines a particular class.
+   */
+  def definesClass(classpathEntry: File): String => Option[FileRef] =
+    getAnalysis(classpathEntry).map { analysis =>
+      // strongly hold the classNames, and transform them to ensure that they are unlinked from
+      // the remainder of the analysis
+      AnalysisMap.RefConstructor(
+        classpathEntry,
+        analysis.relations.classes.reverseMap.keys.toList.toSet
+      )
+    }.getOrElse {
+      // no analysis: return a function that will scan instead
+      Locate.definesClass(classpathEntry)
+    }
+
   /**
    * Gets analysis for a classpath entry (if it exists) by translating its path to a potential
    * cache location and then checking the cache.
@@ -96,5 +118,24 @@ object AnalysisMap {
     }
 
     AnalysisStore.sync(AnalysisStore.cached(fprintStore))
+  }
+
+  /**
+   * A constructor of FileRefs for the given classpath entry.
+   */
+  case class RefConstructor(classpathEntry: File, classNames: Set[String]) extends (String => Option[FileRef]) {
+    private final val refImpl =
+      if (classpathEntry.getName.endsWith(".jar")) {
+        p: String => new FileRefJarred(classpathEntry, p)
+      } else {
+        p: String => new FileRefLoose(new File(p))
+      }
+
+    def apply(className: String): Option[FileRef] =
+      if (classNames(className)) {
+        Some(refImpl(IO.classfilePathForClassname(className)))
+      } else {
+        None
+      }
   }
 }
