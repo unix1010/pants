@@ -348,8 +348,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self.context.products.safe_create_data('product_deps_by_src', dict)
 
   def _register_vts(self, compile_contexts):
-    # TODO
-    classes_by_source = None # self.context.products.get_data('classes_by_source')
+    classes_by_source = self.context.products.get_data('classes_by_source')
     classes_by_target = self.context.products.get_data('classes_by_target')
     compile_classpath = self.context.products.get_data('compile_classpath')
     resources_by_target = self.context.products.get_data('resources_by_target')
@@ -364,7 +363,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       target = compile_context.target
       classes_dir = compile_context.classes_dir
 
-      def add_products_by_target(files):
+      def add_products_by_target(source, files):
         for f in files:
           rel_file, clsname = self._strategy.class_for_class_ref(compile_context, f)
           if clsname:
@@ -372,6 +371,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
             classes_by_target[target].add_rel_paths(classes_dir, [rel_file])
             resources = resource_mapping.get(clsname, [])
             resources_by_target[target].add_abs_paths(classes_dir, resources)
+            if source and classes_by_source is not None:
+              classes_by_source[source].add_rel_paths(classes_dir, [rel_file])
           else:
             # Is a resource.
             resources_by_target[target].add_rel_paths(classes_dir, [rel_file])
@@ -379,19 +380,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       # Collect classfiles (absolute) that were claimed by sources (relative)
       for source in compile_context.sources:
         class_refs = computed_class_refs_by_source.get(source, [])
-        add_products_by_target(class_refs)
-        if classes_by_source is not None:
-          classes_by_source[source].add_abs_paths(classes_dir, class_refs)
+        add_products_by_target(source, class_refs)
 
       # And any that were not claimed by sources (NB: `None` map key.)
-      unclaimed_classes = computed_class_refs_by_source.get(None, [])
-      if unclaimed_classes:
+      unclaimed_refs = computed_class_refs_by_source.get(None, [])
+      if unclaimed_refs:
         self.context.log.debug(
-          items_to_report_element(unclaimed_classes, 'file'),
+          items_to_report_element(unclaimed_refs, 'file'),
           ' not claimed by analysis for ',
           str(compile_context.target)
         )
-        add_products_by_target(unclaimed_classes)
+        add_products_by_target(None, unclaimed_refs)
 
     for compile_context in compile_contexts:
       # Register resource products.
