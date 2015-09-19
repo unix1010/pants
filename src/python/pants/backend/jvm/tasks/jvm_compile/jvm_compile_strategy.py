@@ -160,12 +160,11 @@ class JvmCompileStrategy(object):
       file_name = fast_relpath(match.group(2), compile_context.classes_dir)
 
     # is a resource
-    if not file_name.endswith(".class"):
+    if not file_name.endswith(b".class"):
       return file_name, None
 
     # is a class
-    slashed_class_name = file_name[len(compile_context.classes_dir) + 1:-len(".class")]
-    return file_name, slashed_class_name.replace("/", ".")
+    return file_name, file_name[:-len(".class")].replace("/", ".")
 
   def _compute_sources_by_target(self, targets):
     """Computes and returns a map target->sources (relative to buildroot)."""

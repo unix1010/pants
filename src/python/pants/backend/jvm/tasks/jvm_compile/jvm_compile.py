@@ -381,14 +381,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         class_refs = computed_class_refs_by_source.get(source, [])
         add_products_by_target(class_refs)
         if classes_by_source is not None:
-          # TODO: will explode until we formalize the classref type
           classes_by_source[source].add_abs_paths(classes_dir, class_refs)
 
       # And any that were not claimed by sources (NB: `None` map key.)
       unclaimed_classes = computed_class_refs_by_source.get(None, [])
       if unclaimed_classes:
         self.context.log.debug(
-          items_to_report_element(unclaimed_classes, 'class'),
+          items_to_report_element(unclaimed_classes, 'file'),
           ' not claimed by analysis for ',
           str(compile_context.target)
         )
