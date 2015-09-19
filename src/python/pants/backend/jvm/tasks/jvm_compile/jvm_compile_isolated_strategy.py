@@ -340,20 +340,20 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     def add_abs_products(p):
       if p:
-        for _, paths in p.abs_paths():
-          artifacts.extend(paths)
+        for d, paths in p.rel_paths():
+          # resources located inside the jar are already cached via the jar
+          # TODO: more generally, they probably don't need to tracked at all?
+          if d != compile_context.classes_dir:
+            artifacts.extend(os.path.join(d, path) for path in paths)
     # Resources.
     resources_by_target = self.context.products.get_data('resources_by_target')
     add_abs_products(resources_by_target.get(compile_context.target))
-    # Classes.
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    add_abs_products(classes_by_target.get(compile_context.target))
+    # Jar.
+    artifacts.append(compile_context.classes_dir)
     # Log file.
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):
       artifacts.append(log_file)
-    # Jar.
-    artifacts.append(compile_context.jar_file)
 
     # Get the 'work' that will publish these artifacts to the cache.
     # NB: the portable analysis_file won't exist until we finish.
