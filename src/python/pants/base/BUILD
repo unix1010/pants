@@ -6,7 +6,6 @@ python_library(
   sources = ['address.py'],
   dependencies = [
     ':build_file',
-    'src/python/pants/base:deprecated',
     'src/python/pants/util:meta',
   ]
 )
@@ -83,7 +82,6 @@ python_library(
   sources = ['build_file_aliases.py'],
   dependencies = [
     ':build_file_target_factory',
-    ':deprecated',
     ':target',
     'src/python/pants/util:memo',
   ]
@@ -151,14 +149,11 @@ python_library(
 )
 
 python_library(
-  name = 'config',
-  sources = ['config.py'],
+  name = 'dep_lookup_error',
   dependencies = [
-    '3rdparty/python:six',
-    ':build_environment',
-    'src/python/pants/util:eval',
-    'src/python/pants/util:strutil',
-  ]
+    ':address_lookup_error',
+  ],
+  sources = ['dep_lookup_error.py'],
 )
 
 python_library(
