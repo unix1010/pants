@@ -5,13 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.util.memo import memoized_property
+
 
 class ResolvedJar(object):
-  """Output from the resolve process."""
+  """Represents an artifact resolved from the dependency resolution process."""
 
   def __init__(self, coordinate, cache_path, pants_path=None):
     """
-    :param M2Coordinate coordinate: Coordinate representing this resolved jar.
+    :param coordinate: Coordinate representing this resolved jar.
+    :type coordinate: :class:`M2Coordinate`
     :param string cache_path: Path to the artifact in the ivy cache
     :param string pants_path: Path to the symlink for the artifact in the pants work directory.
     """
@@ -37,21 +40,39 @@ class ResolvedJar(object):
 class M2Coordinate(object):
   """Represents a fully qualified name of an artifact."""
 
-  def __init__(self, org, name, rev=None, classifier=None, type_=None):
+  def __init__(self, org, name, rev=None, classifier=None, ext=None):
     """
-    :param org: Maven equivalent of orgId
-    :param name: Maven equivalent of groupId
-    :param rev: Version of the artifact.
-    :param classifier: Maven equivalent of classifier.
-    :param type_: Maven equivalent of packaging. Defaults to jar.
+    :param string org: The maven dependency `groupId`.
+    :param string name: The maven dependency `artifactId`.
+    :param string rev: The maven dependency `version`.
+    :param string classifier: The maven dependency `classifier`.
+    :param string ext: There is no direct maven parallel, but the maven `packaging` value of the
+                       depended-on artifact for simple cases, and in more complex cases the
+                       extension of the artifact.  For example, 'bundle' packaging implies an
+                       extension of 'jar'.  Defaults to 'jar'.
     """
     self.org = org
     self.name = name
     self.rev = rev
     self.classifier = classifier
-    self.type_ = type_ or 'jar'
+    self.ext = ext or 'jar'
 
-    self._id = (self.org, self.name, self.rev, self.classifier, self.type_)
+    self._id = (self.org, self.name, self.rev, self.classifier, self.ext)
+
+  @memoized_property
+  def artifact_filename(self):
+    """Returns the canonical maven-style filename for an artifact pointed at by this coordinate.
+
+    :rtype: string
+    """
+    def maybe_compenent(component):
+      return '-{}'.format(component) if component else ''
+
+    return '{org}-{name}{rev}{classifier}.{ext}'.format(org=self.org,
+                                                        name=self.name,
+                                                        rev=maybe_compenent(self.rev),
+                                                        classifier=maybe_compenent(self.classifier),
+                                                        ext=self.ext)
 
   def __eq__(self, other):
     return isinstance(other, M2Coordinate) and self._id == other._id
@@ -71,5 +92,5 @@ class M2Coordinate(object):
     return ':'.join((x or '') for x in self._id)
 
   def __repr__(self):
-    return ('M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, type_={!r})'
+    return ('M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
             .format(*self._id))

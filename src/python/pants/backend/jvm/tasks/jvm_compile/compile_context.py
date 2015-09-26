@@ -25,6 +25,11 @@ class CompileContext(object):
     self.classes_dir = classes_dir
     self.sources = sources
 
+  @contextmanager
+  def open_jar(self, mode):
+    with open_zip(self.classes_dir, mode=mode, compression=zipfile.ZIP_STORED) as jar:
+      yield jar
+
   @property
   def _id(self):
     return (self.target, self.analysis_file, self.classes_dir)
@@ -37,12 +42,3 @@ class CompileContext(object):
 
   def __hash__(self):
     return hash(self._id)
-
-
-class IsolatedCompileContext(CompileContext):
-  """Extends CompileContext to add a jar context helper."""
-
-  @contextmanager
-  def open_jar(self, mode):
-    with open_zip(self.classes_dir, mode=mode, compression=zipfile.ZIP_STORED) as jar:
-      yield jar

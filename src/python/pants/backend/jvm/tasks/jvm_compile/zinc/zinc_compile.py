@@ -94,13 +94,16 @@ class ZincCompile(JvmCompile):
              help='Use these scalac plugins.')
     register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
+    # TODO: disable by default because it breaks dependency parsing:
+    #   https://github.com/pantsbuild/pants/issues/2224
+    # ...also, as of sbt 0.13.9, it is significantly slower for cold builds.
     register('--name-hashing', advanced=True, action='store_true', default=False, fingerprint=True,
              help='Use zinc name hashing.')
     register('--whitelisted-args', advanced=True, type=dict_option,
              default={
                '-S.*': False,
                '-C.*': False,
-               '-log-filter': True,
+               '-file-filter': True,
                '-msg-filter': True,
                },
              help='A dict of option regexes that make up pants\' supported API for zinc. '
@@ -110,7 +113,7 @@ class ZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc', '1.0.11')
+                            JarDependency('org.pantsbuild', 'zinc', '1.0.12')
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=[
