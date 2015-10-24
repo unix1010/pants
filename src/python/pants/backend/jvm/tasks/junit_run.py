@@ -346,6 +346,7 @@ class _JUnitRunner(object):
             workunit_name='run',
             workunit_labels=[WorkUnitLabel.TEST],
             cwd=workdir,
+            synthetic_jar_dir=self.workdir,
           ))
 
           if result != 0 and self._fail_fast:
