@@ -133,7 +133,8 @@ class _JUnitRunner(object):
                       custom_rules=[
                         Shader.exclude_package('junit.framework', recursive=True),
                         Shader.exclude_package('org.junit', recursive=True),
-                        Shader.exclude_package('org.hamcrest', recursive=True)
+                        Shader.exclude_package('org.hamcrest', recursive=True),
+                        Shader.exclude_package('org.pantsbuild.junit.annotations', recursive=True),
                       ])
 
   def __init__(self, task_exports, context):
