@@ -357,7 +357,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     if self.cache_target_dirs:
       for vt in invalidation_check.all_vts:
-        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.hash))
+        # NB: Stronger path backported from ab571f16a675703375a363f47201f498ff41118f.
+        key = vt.cache_key
+        vt.create_results_dir(os.path.join(self.workdir, key.id, sha1(key.hash).hexdigest()[:12]))
 
     if not silent:
       targets = []
