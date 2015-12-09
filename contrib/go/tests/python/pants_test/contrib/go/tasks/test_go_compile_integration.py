@@ -9,7 +9,6 @@ import os
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
-from pants_test.testutils.file_test_util import contains_exact_files
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 
@@ -30,8 +29,8 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
                              'pkg/{goos}_{goarch}/{libname}.a'
                              .format(libname=libname, goos=goos, goarch=goarch)
                              for libname in ('libA', 'libB', 'libC', 'libD', 'libE'))
-        self.assertTrue(contains_exact_files(os.path.join(workdir, 'compile', 'go'),
-                                             expected_files, ignore_links=True))
+        self.assert_contains_exact_files(os.path.join(workdir, 'compile', 'go'),
+                                         expected_files, ignore_links=True)
 
   def test_go_compile_cgo(self):
     args = ['compile', 'contrib/go/examples/src/go/cgo']

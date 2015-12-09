@@ -5,13 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
 
 from twitter.common.collections import OrderedSet
 
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_open, safe_walk
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree, safe_walk
 
 
 class ClasspathUtil(object):
@@ -150,8 +149,7 @@ class ClasspathUtil(object):
 
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
-                                 save_classpath_file=False,
-                                 use_target_id=True):
+                                 save_classpath_file=False):
     """Create a stable classpath of symlinks with standardized names.
 
     :param classpath_products: Classpath products.
@@ -164,9 +162,6 @@ class ClasspathUtil(object):
     :rtype: list of strings
     """
     def _stable_output_folder(basedir, target):
-      if use_target_id:
-        return os.path.join(basedir, target.id)
-
       address = target.address
       return os.path.join(
         basedir,
@@ -174,21 +169,10 @@ class ClasspathUtil(object):
         address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
       )
 
-    def safe_delete_current_directory(directory):
-      """Delete only the files or symlinks under the current directory."""
-      try:
-        for name in os.listdir(directory):
-          path = os.path.join(directory, name)
-          if os.path.islink(path) or os.path.isfile(path):
-            safe_delete(path)
-      except OSError as e:
-        if e.errno != errno.ENOENT:
-          raise
-
     canonical_classpath = []
     for target in targets:
       folder_for_target_symlinks = _stable_output_folder(basedir, target)
-      safe_delete_current_directory(folder_for_target_symlinks)
+      safe_rmtree(folder_for_target_symlinks)
 
       classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
         [target])

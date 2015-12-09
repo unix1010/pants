@@ -14,7 +14,7 @@ python_tests(
   sources=['test_examples_integration.py'],
   dependencies=[
     ':base',
-    'tests/python/pants_test/testutils:mock_logger',
+    'tests/python/pants_test/testutils',
   ]
 )
 
@@ -23,7 +23,7 @@ python_tests(
   sources=['test_testprojects_integration.py'],
   dependencies=[
     ':base',
-    'tests/python/pants_test/testutils:mock_logger',
+    'tests/python/pants_test/testutils',
   ]
 )
 
