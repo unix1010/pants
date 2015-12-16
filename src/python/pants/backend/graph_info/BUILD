@@ -4,7 +4,7 @@
 
 python_library(
   name = 'plugin',
-  sources = ['register.py'],
+  sources = ['__init__.py', 'register.py'],
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/goal:task_registrar',
