@@ -19,7 +19,7 @@ python_library(
 
 python_library(
   name = 'build_file_manipulator',
-  sources = ['build_file_manipulator.py'],
+  sources = ['__init__.py', 'build_file_manipulator.py'],
   dependencies = [
     'src/python/pants/build_graph',
   ]
