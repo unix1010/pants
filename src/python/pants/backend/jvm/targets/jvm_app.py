@@ -135,7 +135,7 @@ class Bundle(object):
     else:
       mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), rel_path))
 
-    return BundleProps(self._rel_path, mapper, fileset)
+    return BundleProps(rel_path, mapper, fileset)
 
 
 class BundleField(tuple, PayloadField):
