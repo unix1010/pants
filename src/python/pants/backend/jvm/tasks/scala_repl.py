@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -33,7 +34,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
 
   @classmethod
   def select_targets(cls, target):
-    return isinstance(target, (JarLibrary, JvmTarget))
+    return isinstance(target, (JarLibrary, JvmTarget, JvmApp))
 
   def setup_repl_session(self, targets):
     repl_name = ScalaPlatform.global_instance().repl
