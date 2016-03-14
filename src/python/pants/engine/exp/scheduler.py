@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 from collections import defaultdict
+import threading
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
@@ -59,14 +60,18 @@ class ProductGraph(object):
     # dependencies/dependents lists themselves, but track them independently in order to provide
     # context specific error messages when they are introduced.
     self._cyclic_dependencies = defaultdict(set)
+    # Writer lock.
+    self._lock = threading.RLock()
 
   def _set_state(self, node, state):
-    existing_state = self._node_results.get(node, None)
-    if existing_state is not None:
-      raise ValueError('Node {} is already completed:\n  {}\n  {}'.format(node, existing_state, state))
-    elif type(state) not in [Return, Throw, Noop]:
-      raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
-    self._node_results[node] = state
+    with self._lock:
+      existing_state = self._node_results.get(node, None)
+      if existing_state is not None:
+        raise ValueError('Node {} is already completed:\n  {}\n  {}'
+                         .format(node, existing_state, state))
+      elif type(state) not in [Return, Throw, Noop]:
+        raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
+      self._node_results[node] = state
 
   def is_complete(self, node):
     return node in self._node_results
@@ -158,6 +163,38 @@ class ProductGraph(object):
   def cyclic_dependencies_of(self, node):
     return self._cyclic_dependencies[node]
 
+  def _invalidate_node(self, node):
+    with self._lock:
+      del self._node_results[node]
+      del self._dependencies[node]
+      del self._dependents[node]
+      del self._cyclic_dependencies[node]
+      node.delete()
+
+  def invalidate(self, node_predicate=None, upward=True):
+    """Invalidate all nodes or those returning True for node_predicate(node) in all visible nodes.
+
+    :param func node_predicate: A predicate function matching node objects in the graph.
+    :param bool upward: A boolean indicating whether or not to invalidate all upward nodes from the
+                        nodes matched by the node predicate.
+    """
+    def all_predicate(_): return True
+    node_predicate = node_predicate or all_predicate
+
+    with self._lock:
+      root_nodes = set(node for node in self._node_results.keys() if node_predicate(node))
+      if upward:
+        upward_nodes = set(node for (node, _), _ in self.walk(roots=root_nodes,
+                                                              predicate=all_predicate))
+        invalidated_nodes = root_nodes.union(upward_nodes)
+      else:
+        invalidated_nodes = root_nodes
+
+      for count, node in enumerate(invalidated_nodes, 1):
+        self._invalidate_node(node)
+
+    return count
+
   def walk(self, roots, predicate=None):
     """Yields Nodes depth-first in pre-order, starting from the given roots.
 
@@ -200,10 +237,11 @@ class ProductGraph(object):
 
   def clear(self):
     """Clears all state of the ProductGraph. Exposed for testing."""
-    self._dependencies.clear()
-    self._dependents.clear()
-    self._cyclic_dependencies.clear()
-    self._node_results.clear()
+    self.invalidate()
+    assert not (self._dependencies or
+                self._dependents or
+                self._cyclic_dependencies or
+                self._node_results)
 
 
 class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):

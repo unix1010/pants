@@ -17,7 +17,7 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
                                                 setup_json_scheduler)
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                     Throw)
-from pants.engine.exp.scheduler import PartiallyConsumedInputsError
+from pants.engine.exp.scheduler import PartiallyConsumedInputsError, FilesystemNode
 
 
 class SchedulerTest(unittest.TestCase):
@@ -269,3 +269,60 @@ class SchedulerTest(unittest.TestCase):
     self.assertIn(self.guava, root_value)
     # And that an subdirectory address is not.
     self.assertNotIn(self.managed_guava, root_value)
+
+  def test_roots(self):
+    spec = self.spec_parser.parse_spec('3rdparty/jvm:guava')
+    build_request = self.request_specs(['list'], spec)
+    (root_node, _), _ = self.build_and_walk(build_request)[0]
+
+    # Test that the root/first node from walk() is in the representation of known roots.
+    roots = self.scheduler.product_graph.roots()
+    self.assertIn(root_node, roots)
+
+  @staticmethod
+  def fsnode_predicate(entry):
+    node, state = entry if isinstance(entry, tuple) else entry, None
+    return type(node) is FilesystemNode
+
+  def test_invalidate(self):
+    spec = self.spec_parser.parse_spec('3rdparty/jvm:guava')
+    build_request = self.request_specs(['list'], spec)
+    self.build_and_walk(build_request)
+
+    # Assert a populated before state and empty after state after a full invalidation.
+    self.assertTrue(list(self.scheduler.product_graph.completed_nodes()))
+    self.scheduler.product_graph.invalidate()
+    self.assertFalse(list(self.scheduler.product_graph.completed_nodes()))
+
+  def test_invalidate_partial(self):
+    spec = self.spec_parser.parse_spec('3rdparty/jvm:guava')
+    build_request = self.request_specs(['list'], spec)
+    self.build_and_walk(build_request)
+
+    before_walk = list(self.scheduler.product_graph.completed_nodes())
+    before_walk_fs = list(filter(self.fsnode_predicate,
+                                 self.scheduler.product_graph.completed_nodes()))
+    self.assertTrue(before_walk and before_walk_fs)
+
+    invalidated_ct = self.scheduler.product_graph.invalidate(node_predicate=self.fsnode_predicate,
+                                                             upward=False)
+
+    after_walk = list(self.scheduler.product_graph.completed_nodes())
+    after_walk_fs = list(filter(self.fsnode_predicate,
+                                 self.scheduler.product_graph.completed_nodes()))
+    self.assertTrue(after_walk)
+    self.assertFalse(after_walk_fs)
+
+    self.assertEqual(len(before_walk_fs), invalidated_ct)
+
+  def test_invalidate_partial_upwards(self):
+    spec = self.spec_parser.parse_spec('3rdparty/jvm:guava')
+    build_request = self.request_specs(['list'], spec)
+    self.build_and_walk(build_request)
+
+    before_walk_fs = list(filter(self.fsnode_predicate,
+                                 self.scheduler.product_graph.completed_nodes()))
+
+    invalidated_ct = self.scheduler.product_graph.invalidate(node_predicate=self.fsnode_predicate)
+
+    self.assertGreater(invalidated_ct, len(before_walk_fs))

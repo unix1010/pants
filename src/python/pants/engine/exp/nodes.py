@@ -91,6 +91,9 @@ class Node(object):
     as an explicit dependency type? Perhaps the "is-a/has-a" checks should be native outside of Node?
     """
 
+  def delete(self):
+    del self
+
 
 class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', 'variant_key']), Node):
   """A Node that selects a product for a subject.
