@@ -22,7 +22,7 @@ class ZincAnalysis(object):
   those yourself.
   """
 
-  FORMAT_VERSION_LINE = b'format version: 5\n'
+  FORMAT_VERSION_LINE = b'format version: 6\n'
 
   @classmethod
   def merge(cls, analyses):
