@@ -18,7 +18,7 @@ class RuntimeClasspathPublisher(Task):
   @classmethod
   def register_options(cls, register):
     super(Task, cls).register_options(register)
-    register('--manifest-jar-only', type=bool, default=False,
+    register('--manifest-jar-only', action='store_true', default=False,
              help='Only export classpath in a manifest jar.')
 
   @classmethod
