@@ -90,7 +90,7 @@ class IvyTaskMixin(TaskBase):
     super(IvyTaskMixin, cls).register_options(register)
     register('--jvm-options', type=list, metavar='<option>...',
              help='Run Ivy with these extra jvm options.')
-    register('--soft-excludes', action='store_true', default=False, advanced=True,
+    register('--soft-excludes', action='store_true', default=False, advanced=True, fingerprint=True,
              help='If a target depends on a jar that is excluded by another target '
                   'resolve this jar anyway')
 
