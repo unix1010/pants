@@ -96,7 +96,6 @@ class PantsDaemonLauncher(object):
     self._fs_event_enabled = fs_event_enabled
     self._fs_event_workers = fs_event_workers
     self._path_ignore_patterns = path_ignore_patterns
-    # TODO(kwlzn): Thread filesystem path ignores here to Watchman's subscription registration.
 
     lock_location = os.path.join(self._build_root, '.pantsd.startup')
     self._lock = OwnerPrintingInterProcessFileLock(lock_location)
@@ -123,7 +122,10 @@ class PantsDaemonLauncher(object):
     services = []
     scheduler_service = None
     if self._fs_event_enabled:
-      fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
+      fs_event_service = FSEventService(watchman=watchman,
+                                        build_root=self._build_root,
+                                        path_ignore_patterns=self._path_ignore_patterns,
+                                        worker_count=self._fs_event_workers)
 
       legacy_graph_helper = self._engine_initializer.setup_legacy_graph(self._path_ignore_patterns)
       scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)

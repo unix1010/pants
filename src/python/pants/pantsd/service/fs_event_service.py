@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import fnmatch
 import logging
 import os
 import traceback
@@ -13,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.watchman import Watchman
+from pants.util.fileutil import glob_to_regex
 
 
 class FSEventService(PantsService):
@@ -25,10 +27,11 @@ class FSEventService(PantsService):
 
   ZERO_DEPTH = ['depth', 'eq', 0]
 
-  def __init__(self, watchman, build_root, worker_count):
+  def __init__(self, watchman, build_root, path_ignore_patterns, worker_count):
     """
     :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
     :param str build_root: The current build root.
+    :param list path_ignores: A list of path ignore patterns for Watchman.
     :param int worker_count: The total number of workers to use for the internally managed
                              ThreadPoolExecutor.
     """
@@ -36,6 +39,7 @@ class FSEventService(PantsService):
     self._logger = logging.getLogger(__name__)
     self._watchman = watchman
     self._build_root = os.path.realpath(build_root)
+    self._path_ignore_patterns = path_ignore_patterns
     self._worker_count = worker_count
     self._executor = None
     self._handlers = {}
@@ -49,6 +53,11 @@ class FSEventService(PantsService):
       self._logger.info('shutting down threadpool')
       self._executor.shutdown()
     super(FSEventService, self).terminate()
+
+  def _generate_ruleset_from_ignore_patterns(self, path_ignore_patterns):
+    for glob_pattern in path_ignore_patterns:
+      # N.B. 'wholename' ensures we match against the full relative ('x/y/z') vs file path ('z').
+      yield ['not', ['pcre', glob_to_regex(glob_pattern), 'wholename']]
 
   def register_all_files_handler(self, callback, name='all_files'):
     """Registers a subscription for all files under a given watch path.
@@ -74,14 +83,10 @@ class FSEventService(PantsService):
         # `os.path.dirname(file)` during invalidation subject generation, which covers both cases.
         expression=[
           'allof',  # All of the below rules must be true to match.
-          ['anyof', ['type', 'f'], ['type', 'l']],  # Match only files and symlinks.
-          ['not', ['dirname', 'dist', self.ZERO_DEPTH]],  # Exclude the ./dist dir.
-          # N.B. 'wholename' ensures we match against the absolute ('x/y/z') vs base path ('z').
-          ['not', ['pcre', r'^\..*', 'wholename']],  # Exclude files in hidden dirs (.pants.d etc).
-          ['not', ['match', '*.pyc']]  # Exclude .pyc files.
-          # TODO(kwlzn): Make exclusions here optionable.
-          # Related: https://github.com/pantsbuild/pants/issues/2956
-        ]
+          ['anyof', ['type', 'f'], ['type', 'l']]  # Match only files and symlinks.
+        ] + list(
+          self._generate_ruleset_from_ignore_patterns(self._path_ignore_patterns)
+        )
       ),
       callback
     )

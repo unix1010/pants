@@ -38,3 +38,27 @@ def create_size_estimators():
     'nosize': lambda srcs: 0,
     'random': lambda srcs: random.randint(0, 10000),
   }
+
+
+def glob_to_regex(glob):
+  """Given a glob pattern, return a regex that will match it's path relative to the buildroot.
+
+  :param string glob: The glob pattern.
+  :returns: A regex string that will match a relative glob path with no leading `/`.
+  """
+  replacement_map = (('?', r'.'),
+                     ('.', r'[.]'),
+                     ('**/', r'(?:.*/)?'),
+                     ('*', r'[^/]*'))
+
+  for from_pattern, to_pattern in replacement_map:
+    glob = glob.replace(from_pattern, to_pattern)
+
+  # Treat trailing slashes as "the dir and everything beneath it".
+  if glob.endswith('/'):
+    glob = r'{}(/.*|$)'.format(glob[:-1])
+
+  if glob.startswith('/'):
+    glob = r'^{}'.format(glob[1:])
+
+  return glob
