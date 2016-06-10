@@ -201,13 +201,15 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
 
     # Else, attempt to use a configured task to compute the value.
     dependencies = []
+    returns = []
     matches = []
-    for dep in step_context.gen_nodes(self.subject, self.product, variants):
+    for dep in step_context.gen_nodes(self):
       dep_state = step_context.get(dep)
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:
         # We computed a value: see whether we can use it.
+        returns.append(dep)
         literal_value = self._select_literal(dep_state.value, variant_value)
         if literal_value is not None:
           matches.append((dep, literal_value))
@@ -222,7 +224,11 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     # a value was successfully selected.
     if dependencies:
       return Waiting(dependencies)
-    elif len(matches) == 0:
+
+    # All dependencies were available. Memoize the generate nodes.
+    for dep in returns:
+      step_context.pair(self, dep)
+    if len(matches) == 0:
       return Noop('No source of {}.', self)
     elif len(matches) > 1:
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
@@ -333,7 +339,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
     elif type(output_state) is Noop:
-      return Noop('Successfully projected, but no source of output product for {}.', output_node)
+      return Throw(ValueError('No source of projected dependency {}'.format(output_node)))
     else:
       raise State.raise_unrecognized(output_state)
 
@@ -467,9 +473,16 @@ class StepContext(object):
     else:
       return Waiting([node])
 
-  def gen_nodes(self, subject, product, variants):
-    """Yields Node instances which might be able to provide a value for the given inputs."""
-    return self._node_builder.gen_nodes(subject, product, variants)
+  def gen_nodes(self, select_node):
+    """Yields Node instances which might be able to provide a value for the given SelectNode"""
+    return self._node_builder.gen_nodes(select_node)
+
+  def pair(self, src, gen_node):
+    """Record the successful computation of the given SelectNode with the given gen_node..
+
+    TODO: Formalize.
+    """
+    self._node_builder.gen_node_success(src, gen_node)
 
   def select_node(self, selector, subject, variants):
     """Constructs a Node for the given Selector and the given Subject/Variants.

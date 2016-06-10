@@ -415,15 +415,48 @@ class NodeBuilder(Closable):
 
   def __init__(self, tasks):
     self._tasks = tasks
+    self._memoized_pairs = {}
 
-  def gen_nodes(self, subject, product, variants):
-    if FilesystemNode.is_filesystem_pair(type(subject), product):
+  def gen_nodes(self, select_node):
+    subject = select_node.subject
+    product = select_node.product
+    variants = select_node.variants
+
+    gen_tuple = self._memoized_pairs.get(self._src_tuple(select_node))
+    if gen_tuple is not None:
+      print('>>> hit memoized value {} -> {}'.format(self._src_tuple(select_node), gen_tuple))
+      cls, args = gen_tuple
+      yield cls(subject, product, variants, *args)
+    elif FilesystemNode.is_filesystem_pair(type(subject), product):
       # Native filesystem operations.
       yield FilesystemNode(subject, product, variants)
     else:
       # Tasks.
       for task, anded_clause in self._tasks[product]:
         yield TaskNode(subject, product, variants, task, anded_clause)
+
+  def _src_tuple(self, node):
+    return type(node.subject), node.product, node.variants
+
+  def _gen_tuple(self, node):
+    if FilesystemNode.is_filesystem_pair(type(node.subject), node.product):
+      return (FilesystemNode, tuple())
+    else:
+      return (TaskNode, (node.func, node.clause))
+
+  def gen_node_success(self, src, gen):
+    src_tuple = self._src_tuple(src)
+    gen_tuple = self._gen_tuple(gen)
+    prev_gen_tuple = self._memoized_pairs.get(src_tuple)
+    if prev_gen_tuple is None:
+      print('>>> memoizing {} -> {}'.format(src_tuple, gen_tuple))
+      self._memoized_pairs[src_tuple] = gen_tuple
+    elif prev_gen_tuple != gen_tuple:
+      raise ValueError('More than one gen node was successful for {}:\n  {}\n  {}'.format(
+        src_tuple, prev_gen_tuple, gen_tuple))
+    else:
+      # Already memoized.
+      pass
 
 
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_nodes', 'project_tree'])):
