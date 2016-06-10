@@ -424,7 +424,7 @@ class NodeBuilder(Closable):
 
     gen_tuple = self._memoized_pairs.get(self._src_tuple(select_node))
     if gen_tuple is not None:
-      print('>>> hit memoized value {} -> {}'.format(self._src_tuple(select_node), gen_tuple))
+      #print('>>> hit memoized value {} -> {}'.format(self._src_tuple(select_node), gen_tuple))
       cls, args = gen_tuple
       yield cls(subject, product, variants, *args)
     elif FilesystemNode.is_filesystem_pair(type(subject), product):
@@ -449,13 +449,14 @@ class NodeBuilder(Closable):
     gen_tuple = self._gen_tuple(gen)
     prev_gen_tuple = self._memoized_pairs.get(src_tuple)
     if prev_gen_tuple is None:
-      print('>>> memoizing {} -> {}'.format(src_tuple, gen_tuple))
+      #print('>>> memoizing {} -> {}'.format(src_tuple, gen_tuple))
       self._memoized_pairs[src_tuple] = gen_tuple
     elif prev_gen_tuple != gen_tuple:
       raise ValueError('More than one gen node was successful for {}:\n  {}\n  {}'.format(
         src_tuple, prev_gen_tuple, gen_tuple))
     else:
       # Already memoized.
+      #print('>>> already memoized {} -> {}'.format(src_tuple, gen_tuple))
       pass
 
 
