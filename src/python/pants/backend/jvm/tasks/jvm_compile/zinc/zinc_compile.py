@@ -157,7 +157,10 @@ class BaseZincCompile(JvmCompile):
     # TODO: disable by default because it breaks dependency parsing:
     #   https://github.com/pantsbuild/pants/issues/2224
     # ...also, as of sbt 0.13.9, it is significantly slower for cold builds.
-    register('--name-hashing', advanced=True, type=bool, fingerprint=True,
+    register('--name-hashing', advanced=True, type=bool,
+             removal_hint='Name hashing is required for operation in zinc 1.0.0-X: this '
+                          'option no longer has any effect.',
+             removal_version='1.4.0',
              help='Use zinc name hashing.')
     register('--whitelisted-args', advanced=True, type=dict,
              default={
@@ -197,7 +200,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.10', 'stuhood-zinc-refresh-2'),
+                            JarDependency('org.pantsbuild', 'zinc_2.10', 'stuhood-zinc-refresh-3'),
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=shader_rules)
@@ -335,8 +338,6 @@ class BaseZincCompile(JvmCompile):
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
-    if not self.get_options().name_hashing:
-      zinc_args.append('-no-name-hashing')
     if log_file:
       zinc_args.extend(['-capture-log', log_file])
 
