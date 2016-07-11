@@ -118,7 +118,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 2)]
+    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 3)]
 
   @classmethod
   def compiler_plugin_types(cls):
