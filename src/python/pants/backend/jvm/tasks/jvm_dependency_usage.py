@@ -249,8 +249,8 @@ class JvmDependencyUsage(Task):
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
     target_product_deps_by_src = product_deps_by_src.get(target, {})
-    for src in target.sources_relative_to_buildroot():
-      for product_dep in target_product_deps_by_src.get(os.path.join(buildroot, src), []):
+    for product_deps in target_product_deps_by_src.values():
+      for product_dep in product_deps:
         for dep_tgt in targets_by_file.get(product_dep, []):
           derived_from = dep_tgt.concrete_derived_from
           if not self._select(derived_from):
