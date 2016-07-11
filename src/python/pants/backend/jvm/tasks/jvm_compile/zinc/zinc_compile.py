@@ -117,6 +117,10 @@ class BaseZincCompile(JvmCompile):
     return zinc_args
 
   @classmethod
+  def implementation_version(cls):
+    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 2)]
+
+  @classmethod
   def compiler_plugin_types(cls):
     """A tuple of target types which are compiler plugins."""
     return (AnnotationProcessor, JavacPlugin, ScalacPlugin)
@@ -193,7 +197,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.10', '1468264525-stuhood-zinc-1'),
+                            JarDependency('org.pantsbuild', 'zinc_2.10', 'stuhood-zinc-refresh-2'),
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=shader_rules)
