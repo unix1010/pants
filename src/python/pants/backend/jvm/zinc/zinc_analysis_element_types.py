@@ -40,13 +40,10 @@ class CompileSetup(ZincAnalysisElement):
 
 class Relations(ZincAnalysisElement):
   headers = (b'products', b'binary dependencies',
-             # TODO: The following 4 headers will go away after SBT completes the
-             # transition to the new headers (the 4 after that).
-             b'direct source dependencies', b'direct external dependencies',
-             b'public inherited source dependencies', b'public inherited external dependencies',
              b'member reference internal dependencies', b'member reference external dependencies',
              b'inheritance internal dependencies', b'inheritance external dependencies',
-             b'class names', b'used names')
+             b'local internal inheritance dependencies', b'local external inheritance dependencies',
+             b'class names', b'used names', b'binary class names',)
 
   # Products are src->classfile, binary dependencies are src->jarfile, source/internal dependencies are src->src,
   # TODO: Check if 'used names' really needs to be in pants_home_anywhere, or can it be in pants_home_prefix_only?
