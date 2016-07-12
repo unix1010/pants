@@ -200,7 +200,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.10', 'stuhood-zinc-refresh-3'),
+                            JarDependency('org.pantsbuild', 'zinc_2.10', '20160711170623-sbt-zinc-repo-1'),
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=shader_rules)
