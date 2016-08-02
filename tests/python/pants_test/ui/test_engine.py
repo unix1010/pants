@@ -11,7 +11,7 @@ from pants.ui.engine import EngineConsole
 
 
 class EngineConsoleTest(unittest.TestCase):
-  def test_display(self):
+  def test_lifecycle(self):
     e = EngineConsole(workers=8)
     e.start()
     e.stop()

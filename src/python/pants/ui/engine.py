@@ -61,19 +61,21 @@ class EngineConsole(Terminal):
   def get_proper_location(self):
     y, x = self.get_location()
     return (x - 1, y - 1)
-  #
-  # def _reset_to_initial_position(self):
-  #   """Clears the terminal back to the original position."""
-  #   print(self.)
+
+  def _reset_to_initial_position(self):
+    """Clears the terminal back to the original position."""
+    print(self.move(*self._initial_position), end='')
+    print(self.clear_eos, end='')
 
   def _set_initial_position(self):
-    self._initial_position = self.get_proper_location()
+    y, x = self.get_location()
+    self._initial_position = (y - 1, x - 1)
 
   def start(self):
     """Starts the console display."""
     assert self._display_map is None, 'EngineConsole already activated!'
-    self._ensure_newline()
     self._set_initial_position()
+    self._ensure_newline()
     self._initialize_swimlanes(self._workers)
     # self.set_status('Engine Running')
 
@@ -82,7 +84,10 @@ class EngineConsole(Terminal):
     # Clear output state completely?
     # self.set_status('Engine Shutdown')
     self._display_map = None
-    # self._reset_to_initial_position()
+    self._reset_to_initial_position()
+    print('{pad}{term.bright_green}✓{term.normal} computed 10 trillion products in 9 iterations in .4 seconds'
+          .format(pad=self.padding, term=self))
+    self._ensure_newline()
 
   def set_status(self, status):
     """Sets the status for the engine."""
@@ -96,25 +101,3 @@ class EngineConsole(Terminal):
     """Sets the result for a given worker."""
     self._write_line(worker, result)
 
-
-def main():
-  import time, random
-  worker_count = 8
-  random_workers = range(1, worker_count + 1)
-  random_sleeps = (0, 0, 0, 0, 0, 0.1) #, 0.2) #, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
-  random_products = ('FileContent', 'FileFingerprint', 'DirectoryListing',
-                     'PythonBinary', 'PythonLibrary', 'Sources', 'PathGlobs')
-  print('[workunit]'); time.sleep(.5)
-  print('  [workunit1]'); time.sleep(.3)
-  print('  [workunit2]'); time.sleep(.1)
-  e = EngineConsole(workers=worker_count, padding=4)
-  e.start()
-  for i in range(500):
-    random_product = random.choice(random_products)
-    random_requester = random.choice(random_products)
-    random_worker = random.choice(random_workers)
-    e.set_action(random_worker, 'computing {} for {}'.format(random_product, random_requester))
-    time.sleep(random.choice(random_sleeps))
-  e.stop()
-  print('  [workunit3]'); time.sleep(.3)
-  print('[end]')
