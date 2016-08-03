@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.ui.colors import colorize, black, red, green, yellow, blue, magenta, cyan, white, COLORS
+from pants.ui.colors import COLORS, black, blue, colorize, cyan, green, magenta, red, white, yellow
 
 
 class ColorsTest(unittest.TestCase):
