@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'colors',
+  sources = ['colors.py']
+)
+
+python_library(
   name = 'engine',
   sources = ['engine.py'],
   dependencies = ['3rdparty/python:blessed']
@@ -12,3 +17,4 @@ python_binary(
   dependencies = [':engine'],
   entry_point = 'pants.ui.engine:main'
 )
+
