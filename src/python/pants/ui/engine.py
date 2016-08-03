@@ -37,31 +37,32 @@ class EngineConsole(Terminal):
     return (x - 1, y - 1)
 
   def _initialize_swimlanes(self, worker_count):
-    # Initialize the printable space for the top level engine status slot.
     self._display_map = {0: self.get_location()}
-    # print(self.bright_white_on_blue(' ' * int(self.width / 3)))
 
     # Initialize the printable space for the worker status slots.
     for i in range(1, worker_count + 1):
-      print('{pad}{term.bright_green}⚡{term.normal}'.format(pad=self.padding, term=self), end=' ')
+      self._stream.write('{pad}{term.bright_green}⚡{term.normal} '
+                         .format(pad=self.padding, term=self))
       self._stream.flush()
       # Capture the cursor location after the line label as our future starting point for writes.
       self._display_map[i] = self.get_proper_location()
-      print()
+      self._stream.write('\n')
 
   def _write_line(self, pos, line):
     with self.location(*self._display_map[pos]):
-      print(line.ljust(self.width - 10), end='')
+      self._stream.write(line.ljust(self.width - 10))
       self._stream.flush()
 
   def _ensure_newline(self):
     """Ensures a clean start on a non-indented line."""
     if self.get_proper_column() != 0:
-      print()
+      self._stream.write('\n')
 
   def _reset_to_initial_position(self):
     """Clears the terminal back to the original position."""
-    print(self.move(*self._initial_position), self.clear_eos, end='')
+    self._stream.write(self.move(*self._initial_position))   # Move to initial position.
+    self._stream.write(self.clear_eos)                       # Clear to end of screen.
+    self._stream.flush()
 
   def _set_initial_position(self):
     # We reverse this because the inputs to Terminal.move() differ from Terminal.location(). This
@@ -80,8 +81,11 @@ class EngineConsole(Terminal):
     # Clear output state completely?
     self._display_map = None
     self._reset_to_initial_position()
-    print('{pad}{term.bright_green}✓{term.normal} computed 10 trillion products in 9 iterations in .4 seconds'
-          .format(pad=self.padding, term=self))
+    self._stream.write(
+      '{pad}{term.bright_green}✓{term.normal} computed 10 trillion products in 9 iterations in .4 seconds'
+      .format(pad=self.padding, term=self)
+    )
+    self._ensure_newline()
 
   def set_action(self, worker, status):
     """Sets the current action for a given worker."""
@@ -90,4 +94,3 @@ class EngineConsole(Terminal):
   def set_result(self, worker, result):
     """Sets the result for a given worker."""
     self._write_line(worker, result)
-
