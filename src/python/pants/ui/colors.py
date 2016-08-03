@@ -10,8 +10,9 @@ from functools import partial
 
 
 ESCAPE = '\x1b'
-ESCAPE_START = '{}['.format(ESCAPE)
-ESCAPE_END = '{}[0m'.format(ESCAPE)  # Clears all formatting.
+ESCAPE_SEQ_PREFIX = '{}['.format(ESCAPE)
+ESCAPE_SEQ_SUFFIX = 'm'
+ESCAPE_CLEAR = '{}0{}'.format(ESCAPE_SEQ_PREFIX, ESCAPE_SEQ_SUFFIX)  # Clears all formatting.
 COLORS = {
   'black': 0,
   'red': 1,
@@ -25,7 +26,7 @@ COLORS = {
 
 
 def colorize(s, color, background=None):
-  """Color a string using printable terminal escape sequences.
+  """Color a string using simple, printable terminal escape sequences.
 
   :param string s: A string to colorize.
   :param string color: The foreground color name.
@@ -38,17 +39,18 @@ def colorize(s, color, background=None):
   # Generate an escape sequence like: '\x1b[33mpants\x1b[0m'
   return ''.join(
     (
-      ESCAPE_START,
+      ESCAPE_SEQ_PREFIX,
       str(30 + COLORS[color]),
-      ';{}m'.format(40 + COLORS[background]) if background else 'm',
+      ';{}'.format(40 + COLORS[background]) if background else '',
+      ESCAPE_SEQ_SUFFIX,
       s,
-      ESCAPE_END
+      ESCAPE_CLEAR
     )
   )
 
 
-def strip_color(s):
-  return re.sub(r'{}\[.+?m'.format(ESCAPE), '', s)
+def strip_escape(s):
+  return re.sub(r'{}\[.+?{}'.format(ESCAPE, ESCAPE_SEQ_SUFFIX), '', s)
 
 
 black = partial(colorize, color='black')

@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.ui.colors import COLORS, black, blue, colorize, cyan, green, magenta, red, white, yellow
+from pants.ui.colors import (COLORS, black, blue, colorize, cyan, green, magenta, red, strip_escape,
+                             white, yellow)
 
 
 class ColorsTest(unittest.TestCase):
@@ -36,3 +37,9 @@ class ColorsTest(unittest.TestCase):
       print(magenta('magenta', background=background_color))
       print(cyan('cyan', background=background_color))
       print(white('white', background=background_color))
+
+  def test_uncolorize(self):
+    for color in COLORS:
+      self.assertEquals(color, strip_escape(colorize(color, color)))
+      for background_color in COLORS:
+        self.assertEquals(color, strip_escape(colorize(color, color, background_color)))

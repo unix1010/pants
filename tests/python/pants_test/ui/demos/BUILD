@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_binary(
-  name='engine_demo',
-  source='engine_demo.py',
+  name='engine_console_demo',
+  source='engine_console_demo.py',
   dependencies=['src/python/pants/ui:engine']
 )
