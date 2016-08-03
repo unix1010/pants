@@ -29,14 +29,15 @@ def main():
 
   e = ParallelConsole(workers=worker_count, padding=4)
   e.start()
+  start = time.time()
   for i in range(1000):
     random_product = random.choice(random_products)
     random_requester = random.choice(random_products)
     random_worker = random.choice(random_workers)
     # random_status = random.choice((True, False))
-    e.set_action(random_worker, 'computing {} for {}'.format(random_product, random_requester))
+    e.set_activity(random_worker, 'computing {} for {}'.format(random_product, random_requester))
     time.sleep(random.choice(random_sleeps))
-  e.stop(True, 'computed 6 trillion products in 93 iterations in 3 seconds')
+  e.stop(True, 'computed 6 trillion products in 93 iterations in {} seconds'.format(time.time() - start))
 
   print('  [workunit3]')
   time.sleep(.3)
