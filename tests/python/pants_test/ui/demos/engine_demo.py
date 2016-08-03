@@ -24,7 +24,7 @@ def main():
   time.sleep(.3)
   print('  [workunit1]')
   time.sleep(.2)
-  print('  [workunit2]')
+  print('  [workunit2]', end='')
   time.sleep(.1)
 
   e = EngineConsole(workers=worker_count, padding=4)

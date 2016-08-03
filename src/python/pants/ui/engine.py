@@ -29,11 +29,12 @@ class EngineConsole(Terminal):
   def padding(self):
     return ' ' * self._padding
 
-  def get_row(self):
-    return self.get_location()[0]
+  def get_proper_column(self):
+    return self.get_proper_location()[1]
 
-  def get_column(self):
-    return self.get_location()[1]
+  def get_proper_location(self):
+    y, x = self.get_location()
+    return (x - 1, y - 1)
 
   def _initialize_swimlanes(self, worker_count):
     # Initialize the printable space for the top level engine status slot.
@@ -55,43 +56,32 @@ class EngineConsole(Terminal):
 
   def _ensure_newline(self):
     """Ensures a clean start on a non-indented line."""
-    if self.get_column() != 1:
+    if self.get_proper_column() != 0:
       print()
-
-  def get_proper_location(self):
-    y, x = self.get_location()
-    return (x - 1, y - 1)
 
   def _reset_to_initial_position(self):
     """Clears the terminal back to the original position."""
-    print(self.move(*self._initial_position), end='')
-    print(self.clear_eos, end='')
+    print(self.move(*self._initial_position), self.clear_eos, end='')
 
   def _set_initial_position(self):
-    y, x = self.get_location()
-    self._initial_position = (y - 1, x - 1)
+    # We reverse this because the inputs to Terminal.move() differ from Terminal.location(). This
+    # is used with the former (which is permanent) whereas most other output uses the latter.
+    self._initial_position = reversed(self.get_proper_location())
 
   def start(self):
     """Starts the console display."""
     assert self._display_map is None, 'EngineConsole already activated!'
-    self._set_initial_position()
     self._ensure_newline()
+    self._set_initial_position()
     self._initialize_swimlanes(self._workers)
-    # self.set_status('Engine Running')
 
   def stop(self):
     """Stops the console display."""
     # Clear output state completely?
-    # self.set_status('Engine Shutdown')
     self._display_map = None
     self._reset_to_initial_position()
     print('{pad}{term.bright_green}✓{term.normal} computed 10 trillion products in 9 iterations in .4 seconds'
           .format(pad=self.padding, term=self))
-    self._ensure_newline()
-
-  def set_status(self, status):
-    """Sets the status for the engine."""
-    # self._write_line(0, self.bright_green(status.ljust(int(self.width / 3))))
 
   def set_action(self, worker, status):
     """Sets the current action for a given worker."""
