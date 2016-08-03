@@ -4,5 +4,5 @@
 python_binary(
   name='engine_console_demo',
   source='engine_console_demo.py',
-  dependencies=['src/python/pants/ui:engine']
+  dependencies=['src/python/pants/ui:console']
 )

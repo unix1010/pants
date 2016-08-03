@@ -7,14 +7,7 @@ python_library(
 )
 
 python_library(
-  name = 'engine',
-  sources = ['engine.py'],
+  name = 'console',
+  sources = ['console.py'],
   dependencies = ['3rdparty/python:blessed']
 )
-
-python_binary(
-  name = 'engine_bin',
-  dependencies = [':engine'],
-  entry_point = 'pants.ui.engine:main'
-)
-

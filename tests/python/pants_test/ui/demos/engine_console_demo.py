@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import random
 import time
 
-from pants.ui.engine import EngineConsole
+from pants.ui.console import ParallelConsole
 
 
 def main():
@@ -16,7 +16,7 @@ def main():
 
   worker_count = 8
   random_workers = range(1, worker_count + 1)
-  random_sleeps = (0, 0, 0, 0, 0, 0.1)
+  random_sleeps = (0, 0, 0, 0, 0, 0.01, 0.02, 0.03, 0.04, 0.05)
   random_products = ('FileContent', 'FileFingerprint', 'DirectoryListing',
                      'PythonBinary', 'PythonLibrary', 'Sources', 'PathGlobs')
 
@@ -27,15 +27,16 @@ def main():
   print('  [workunit2]', end='')
   time.sleep(.1)
 
-  e = EngineConsole(workers=worker_count, padding=4)
+  e = ParallelConsole(workers=worker_count, padding=4)
   e.start()
-  for i in range(500):
+  for i in range(1000):
     random_product = random.choice(random_products)
     random_requester = random.choice(random_products)
     random_worker = random.choice(random_workers)
+    # random_status = random.choice((True, False))
     e.set_action(random_worker, 'computing {} for {}'.format(random_product, random_requester))
     time.sleep(random.choice(random_sleeps))
-  e.stop()
+  e.stop(True, 'computed 6 trillion products in 93 iterations in 3 seconds')
 
   print('  [workunit3]')
   time.sleep(.3)
