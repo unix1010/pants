@@ -33,36 +33,10 @@ class ParallelConsole(Terminal):
     self._display_map = None
     self._summary = None
 
-  @contextmanager
-  def _echo_disabled(self):
-    """A context manager that disables tty input echoing.
-
-    This helps prevent user input from scrolling fixed curses output off the screen. Mostly lifted
-    from the stdlib's `getpass` module.
-    """
-    # TODO(kwlzn): this is not pailgun friendly.
-    fd = os.open('/dev/tty', os.O_RDWR | os.O_NOCTTY)
-    orig_attrs = termios.tcgetattr(fd)
-    new_attrs = orig_attrs[:]
-    new_attrs[3] &= ~termios.ECHO
-    flags = termios.TCSAFLUSH | getattr(termios, 'TCSASOFT', 0)
-    try:
-      termios.tcsetattr(fd, flags, new_attrs)
-      yield
-    finally:
-      termios.tcsetattr(fd, flags, orig_attrs)
-
   @property
   def padding(self):
     """Returns the indentation padding as a string."""
     return ' ' * self._padding
-
-  def _get_status_glyph(self, success):
-    """Returns a glyph appropriate for prefixing a status summary line based on success/failure.
-
-    :param bool success: True if success, False if not.
-    """
-    return self.bright_green('✓') if success else self.bright_red('✗')
 
   def get_proper_column(self):
     """Retrieves the cursor column location with an offset appropriate for use with Terminal.location().
@@ -105,17 +79,24 @@ class ParallelConsole(Terminal):
     if self.get_proper_column() != 0:
       self.stream.write('\n')
 
+  def _set_initial_position(self):
+    """Sets the initial position of the cursor before drawing."""
+    # We reverse this because the inputs to Terminal.move() differ from Terminal.location(). This
+    # is used with the former (which is permanent) whereas most other output uses the latter.
+    self._initial_position = reversed(self.get_proper_location())
+
   def _reset_to_initial_position(self):
     """Clears the terminal back to the original position."""
     self.stream.write(self.move(*self._initial_position))   # Move to initial position.
     self.stream.write(self.clear_eos)                       # Clear to end of screen.
     self.stream.flush()
 
-  def _set_initial_position(self):
-    """Sets the initial position of the cursor before drawing."""
-    # We reverse this because the inputs to Terminal.move() differ from Terminal.location(). This
-    # is used with the former (which is permanent) whereas most other output uses the latter.
-    self._initial_position = reversed(self.get_proper_location())
+  def _get_status_glyph(self, success):
+    """Returns a glyph appropriate for prefixing a status summary line based on success/failure.
+
+    :param bool success: True if success, False if not.
+    """
+    return self.bright_green('✓') if success else self.bright_red('✗')
 
   def _start(self):
     """Starts the console display."""
@@ -135,6 +116,25 @@ class ParallelConsole(Terminal):
       self._reset_to_initial_position()
       self.stream.write('{}{} {}'.format(self.padding, self._get_status_glyph(success), summary))
       self._ensure_newline()
+
+  @contextmanager
+  def _echo_disabled(self):
+    """A context manager that disables tty input echoing.
+
+    This helps prevent user input from scrolling fixed curses output off the screen. Mostly lifted
+    from the stdlib's `getpass` module.
+    """
+    # TODO(kwlzn): this is not pailgun friendly.
+    fd = os.open('/dev/tty', os.O_RDWR | os.O_NOCTTY)
+    orig_attrs = termios.tcgetattr(fd)
+    new_attrs = orig_attrs[:]
+    new_attrs[3] &= ~termios.ECHO
+    flags = termios.TCSAFLUSH | getattr(termios, 'TCSASOFT', 0)
+    try:
+      termios.tcsetattr(fd, flags, new_attrs)
+      yield
+    finally:
+      termios.tcsetattr(fd, flags, orig_attrs)
 
   @contextmanager
   def active(self):
