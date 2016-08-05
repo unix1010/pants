@@ -5,7 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import sys
+import termios
+from contextlib import contextmanager
 
 from blessed import Terminal
 
@@ -16,42 +19,83 @@ class ParallelConsole(Terminal):
   def __init__(self, workers, padding=0, stream=None, swimlane_glyph=None):
     """
     :param int workers: Number of workers to display output for.
-    :param file stream: The stream to emit output on.
+    :param int padding: The amount of whitespace padding to insert before all input. This is useful
+                        for nesting appropriately under work unit output, etc.
+    :param file stream: The stream to emit output on (defaults to sys.stdout).
+    :param string swimlane_glyph: A glyph string to display in front of every worker's swimlane.
     """
-    _stream = stream or sys.stdout
-    super(ParallelConsole, self).__init__(stream=_stream)
+    super(ParallelConsole, self).__init__(stream=stream or sys.stdout)
     self._workers = workers
     self._swimlane_glyph = swimlane_glyph or self.bright_green('⚡')
     self._padding = padding
+
     self._initial_position = None
     self._display_map = None
+    self._summary = None
+
+  @staticmethod
+  @contextmanager
+  def echo_disabled():
+    """A context manager that disables tty input echoing.
+
+    This helps prevent user input from scrolling fixed curses output off the screen. Mostly lifted
+    from the stdlib's `getpass` module.
+    """
+    with os.open('/dev/tty', os.O_RDWR | os.O_NOCTTY) as fd:
+      orig_attrs = termios.tcgetattr(fd)
+      new_attrs = orig_attrs[:]
+      new_attrs[3] &= ~termios.ECHO
+      flags = termios.TCSAFLUSH | getattr(termios, 'TCSASOFT', 0)
+      try:
+        termios.tcsetattr(fd, flags, new_attrs)
+        yield
+      finally:
+        termios.tcsetattr(fd, flags, orig_attrs)
 
   @property
   def padding(self):
+    """Returns the indentation padding as a string."""
     return ' ' * self._padding
 
   def _get_status_glyph(self, success):
+    """Returns a glyph appropriate for prefixing a status summary line based on success/failure.
+
+    :param bool success: True if success, False if not.
+    """
     return self.bright_green('✓') if success else self.bright_red('✗')
 
   def get_proper_column(self):
+    """Retrieves the cursor column location with an offset appropriate for use with
+    Terminal.location."""
     return self.get_proper_location()[1]
 
   def get_proper_location(self):
+    """Retrieves the cursor location with an offset appropriate for use with Terminal.location()."""
     y, x = self.get_location()
     return (x - 1, y - 1)
 
   def _initialize_swimlanes(self, worker_count):
+    """Draws initial swimlanes for the worker count and maps cursor positions to index positions.
+
+    :param int worker_count: The number of swimlanes to map.
+    """
     self._display_map = {0: self.get_location()}
 
     # Initialize the printable space for the worker status slots.
     for i in range(1, worker_count + 1):
       self.stream.write('{}{} '.format(self.padding, self._swimlane_glyph))
+      # Without a flush here, the captured post-write cursor position won't be guaranteed.
       self.stream.flush()
       # Capture the cursor location after the line label as our future starting point for writes.
       self._display_map[i] = self.get_proper_location()
       self.stream.write('\n')
 
   def _write_line(self, pos, line):
+    """Writes a line to the worker swimlane given an index position.
+
+    :param int pos: The index position to write to.
+    :param string line: The line to display at the index position.
+    """
     with self.location(*self._display_map[pos]):
       self.stream.write(line.ljust(self.width - 10))
       self.stream.flush()
@@ -68,6 +112,7 @@ class ParallelConsole(Terminal):
     self.stream.flush()
 
   def _set_initial_position(self):
+    """Sets the initial position of the cursor before drawing."""
     # We reverse this because the inputs to Terminal.move() differ from Terminal.location(). This
     # is used with the former (which is permanent) whereas most other output uses the latter.
     self._initial_position = reversed(self.get_proper_location())
@@ -80,18 +125,23 @@ class ParallelConsole(Terminal):
     self.stream.write(self.hide_cursor)
     self._initialize_swimlanes(self._workers)
 
-  def stop(self, success, summary=None):
-    """Stops the console display.
+  def stop(self):
+    """Stops the console display."""
+    self._display_map = None
+    self.stream.write(self.normal_cursor)
+    if self._summary:
+      success, summary = self._summary
+      self._reset_to_initial_position()
+      self.stream.write('{}{} {}'.format(self.padding, self._get_status_glyph(success), summary))
+      self._ensure_newline()
+
+  def set_summary(self, success, summary=None):
+    """Sets the summary, which is displayed when stop() is called.
 
     :param bool success: True if the parallel work ran without error, False otherwise.
     :param string summary: A string summary to display. This will cause the worker output to clear.
     """
-    self._display_map = None
-    self.stream.write(self.normal_cursor)
-    if summary:
-      self._reset_to_initial_position()
-      self.stream.write('{}{} {}'.format(self.padding, self._get_status_glyph(success), summary))
-      self._ensure_newline()
+    self._summary = success, summary
 
   def set_activity(self, worker, activity):
     """Sets the current activity for a given worker.

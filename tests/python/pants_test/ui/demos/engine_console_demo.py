@@ -28,16 +28,24 @@ def main():
   time.sleep(.1)
 
   e = ParallelConsole(workers=worker_count, padding=4)
-  e.start()
-  start = time.time()
-  for i in range(1000):
-    random_product = random.choice(random_products)
-    random_requester = random.choice(random_products)
-    random_worker = random.choice(random_workers)
-    # random_status = random.choice((True, False))
-    e.set_activity(random_worker, 'computing {} for {}'.format(random_product, random_requester))
-    time.sleep(random.choice(random_sleeps))
-  e.stop(True, 'computed 6 trillion products in 93 iterations in {} seconds'.format(time.time() - start))
+  try:
+    e.start()
+    start = time.time()
+    for i in range(500):
+      random_product = random.choice(random_products)
+      random_requester = random.choice(random_products)
+      random_worker = random.choice(random_workers)
+      e.set_activity(random_worker, 'computing {} for {}'.format(random_product, random_requester))
+      time.sleep(random.choice(random_sleeps))
+
+    e.set_summary(
+      True,
+      'computed 6 trillion products in 93 iterations in {} seconds'.format(time.time() - start)
+    )
+  except (Exception, KeyboardInterrupt) as exc:
+    e.set_summary(False, 'failed: {!r}'.format(exc))
+  finally:
+    e.stop()
 
   print('  [workunit3]')
   time.sleep(.3)
