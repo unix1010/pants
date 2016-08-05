@@ -152,6 +152,10 @@ class ParallelConsole(object):
       finally:
         self._stop()
 
+  def clear(self):
+    """Clears the screen."""
+    self._stream.write(self._term.clear)
+
   def set_summary(self, success, summary):
     """Sets the summary, which is displayed when stop() is called.
 
@@ -167,7 +171,3 @@ class ParallelConsole(object):
     :param string activity: The worker activity.
     """
     self._write_line(worker, activity)
-
-  def clear(self):
-    """Clears the screen."""
-    print(self._term.clear, end='')
