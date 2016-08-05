@@ -12,13 +12,16 @@ from pants.ui.console import ParallelConsole
 
 
 def main():
-  """A mock-data driven demo of EngineConsole capabilities."""
+  """A mock driven demo of EngineConsole capabilities."""
 
   worker_count = 8
   random_workers = range(1, worker_count + 1)
-  random_sleeps = (0, 0, 0, 0, 0, 0.01, 0.02, 0.03, 0.04, 0.05)
+  random_sleeps = (0, 0, 0, 0, 0, 0.01, 0.02, 0.03, 0.04)
   random_products = ('FileContent', 'FileFingerprint', 'DirectoryListing',
                      'PythonBinary', 'PythonLibrary', 'Sources', 'PathGlobs')
+
+  console = ParallelConsole(workers=worker_count, padding=4)
+  print(console.clear, end='')
 
   print('[workunit]')
   time.sleep(.3)
@@ -27,25 +30,23 @@ def main():
   print('  [workunit2]', end='')
   time.sleep(.1)
 
-  e = ParallelConsole(workers=worker_count, padding=4)
-  try:
-    e.start()
-    start = time.time()
-    for i in range(500):
-      random_product = random.choice(random_products)
-      random_requester = random.choice(random_products)
-      random_worker = random.choice(random_workers)
-      e.set_activity(random_worker, 'computing {} for {}'.format(random_product, random_requester))
-      time.sleep(random.choice(random_sleeps))
-
-    e.set_summary(
-      True,
-      'computed 6 trillion products in 93 iterations in {} seconds'.format(time.time() - start)
-    )
-  except (Exception, KeyboardInterrupt) as exc:
-    e.set_summary(False, 'failed: {!r}'.format(exc))
-  finally:
-    e.stop()
+  with console.active():
+    try:
+      start = time.time()
+      for i in range(500):
+        random_product = random.choice(random_products)
+        random_requester = random.choice(random_products)
+        random_worker = random.choice(random_workers)
+        console.set_activity(random_worker,
+                             'computing {} for {}'.format(random_product, random_requester))
+        time.sleep(random.choice(random_sleeps))
+      console.set_summary(
+        True,
+        'computed 6 trillion products in 93 iterations in {} seconds'.format(time.time() - start)
+      )
+    except (Exception, KeyboardInterrupt) as e:
+      console.set_summary(False, 'failed: {!r}'.format(e))
+      raise
 
   print('  [workunit3]')
   time.sleep(.3)

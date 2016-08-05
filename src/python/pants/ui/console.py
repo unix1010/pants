@@ -33,24 +33,24 @@ class ParallelConsole(Terminal):
     self._display_map = None
     self._summary = None
 
-  @staticmethod
   @contextmanager
-  def echo_disabled():
+  def _echo_disabled(self):
     """A context manager that disables tty input echoing.
 
     This helps prevent user input from scrolling fixed curses output off the screen. Mostly lifted
     from the stdlib's `getpass` module.
     """
-    with os.open('/dev/tty', os.O_RDWR | os.O_NOCTTY) as fd:
-      orig_attrs = termios.tcgetattr(fd)
-      new_attrs = orig_attrs[:]
-      new_attrs[3] &= ~termios.ECHO
-      flags = termios.TCSAFLUSH | getattr(termios, 'TCSASOFT', 0)
-      try:
-        termios.tcsetattr(fd, flags, new_attrs)
-        yield
-      finally:
-        termios.tcsetattr(fd, flags, orig_attrs)
+    # TODO(kwlzn): this is not pailgun friendly.
+    fd = os.open('/dev/tty', os.O_RDWR | os.O_NOCTTY)
+    orig_attrs = termios.tcgetattr(fd)
+    new_attrs = orig_attrs[:]
+    new_attrs[3] &= ~termios.ECHO
+    flags = termios.TCSAFLUSH | getattr(termios, 'TCSASOFT', 0)
+    try:
+      termios.tcsetattr(fd, flags, new_attrs)
+      yield
+    finally:
+      termios.tcsetattr(fd, flags, orig_attrs)
 
   @property
   def padding(self):
@@ -65,8 +65,8 @@ class ParallelConsole(Terminal):
     return self.bright_green('✓') if success else self.bright_red('✗')
 
   def get_proper_column(self):
-    """Retrieves the cursor column location with an offset appropriate for use with
-    Terminal.location."""
+    """Retrieves the cursor column location with an offset appropriate for use with Terminal.location().
+    """
     return self.get_proper_location()[1]
 
   def get_proper_location(self):
@@ -117,15 +117,16 @@ class ParallelConsole(Terminal):
     # is used with the former (which is permanent) whereas most other output uses the latter.
     self._initial_position = reversed(self.get_proper_location())
 
-  def start(self):
+  def _start(self):
     """Starts the console display."""
     assert self._display_map is None, 'console already activated!'
+    self._summary = None
     self._ensure_newline()
     self._set_initial_position()
     self.stream.write(self.hide_cursor)
     self._initialize_swimlanes(self._workers)
 
-  def stop(self):
+  def _stop(self):
     """Stops the console display."""
     self._display_map = None
     self.stream.write(self.normal_cursor)
@@ -135,7 +136,20 @@ class ParallelConsole(Terminal):
       self.stream.write('{}{} {}'.format(self.padding, self._get_status_glyph(success), summary))
       self._ensure_newline()
 
-  def set_summary(self, success, summary=None):
+  @contextmanager
+  def active(self):
+    """A contextmanager that controls the lifecycle of a single invocation of the console.
+
+    May be called multiple times against the same object.
+    """
+    with self._echo_disabled():
+      try:
+        self._start()
+        yield
+      finally:
+        self._stop()
+
+  def set_summary(self, success, summary):
     """Sets the summary, which is displayed when stop() is called.
 
     :param bool success: True if the parallel work ran without error, False otherwise.
