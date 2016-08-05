@@ -21,7 +21,7 @@ def main():
                      'PythonBinary', 'PythonLibrary', 'Sources', 'PathGlobs')
 
   console = ParallelConsole(workers=worker_count, padding=4)
-  print(console.clear, end='')
+  console.clear()
 
   print('[workunit]')
   time.sleep(.3)

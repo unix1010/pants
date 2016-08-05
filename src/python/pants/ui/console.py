@@ -13,31 +13,7 @@ from contextlib import contextmanager
 from blessed import Terminal
 
 
-class ParallelConsole(Terminal):
-  """A console UI for displaying concurrent work status."""
-
-  def __init__(self, workers, padding=0, stream=None, swimlane_glyph=None):
-    """
-    :param int workers: Number of workers to display output for.
-    :param int padding: The amount of whitespace padding to insert before all input. This is useful
-                        for nesting appropriately under work unit output, etc.
-    :param file stream: The stream to emit output on (defaults to sys.stdout).
-    :param string swimlane_glyph: A glyph string to display in front of every worker's swimlane.
-    """
-    super(ParallelConsole, self).__init__(stream=stream or sys.stdout)
-    self._workers = workers
-    self._swimlane_glyph = swimlane_glyph or self.bright_green('⚡')
-    self._padding = padding
-
-    self._initial_position = None
-    self._display_map = None
-    self._summary = None
-
-  @property
-  def padding(self):
-    """Returns the indentation padding as a string."""
-    return ' ' * self._padding
-
+class ProperTerminal(Terminal):
   def get_proper_column(self):
     """Retrieves the cursor column location with an offset appropriate for use with Terminal.location().
     """
@@ -48,21 +24,48 @@ class ParallelConsole(Terminal):
     y, x = self.get_location()
     return (x - 1, y - 1)
 
+
+class ParallelConsole(object):
+  """A console UI for displaying concurrent work status."""
+
+  def __init__(self, workers, padding=0, stream=None, swimlane_glyph=None):
+    """
+    :param int workers: Number of workers to display output for.
+    :param int padding: The amount of whitespace padding to insert before all input. This is useful
+                        for nesting appropriately under work unit output, etc.
+    :param file stream: The stream to emit output on (defaults to sys.stdout).
+    :param string swimlane_glyph: A glyph string to display in front of every worker's swimlane.
+    """
+    self._workers = workers
+    self._padding = padding
+    self._stream = stream or sys.stdout
+    self._term = ProperTerminal(stream=self._stream)
+    self._swimlane_glyph = swimlane_glyph or self._term.bright_green('⚡')
+
+    self._initial_position = None
+    self._display_map = None
+    self._summary = None
+
+  @property
+  def padding(self):
+    """Returns the indentation padding as a string."""
+    return ' ' * self._padding
+
   def _initialize_swimlanes(self, worker_count):
     """Draws initial swimlanes for the worker count and maps cursor positions to index positions.
 
     :param int worker_count: The number of swimlanes to map.
     """
-    self._display_map = {0: self.get_location()}
+    self._display_map = {0: self._term.get_location()}
 
     # Initialize the printable space for the worker status slots.
     for i in range(1, worker_count + 1):
-      self.stream.write('{}{} '.format(self.padding, self._swimlane_glyph))
+      self._stream.write('{}{} '.format(self.padding, self._swimlane_glyph))
       # Without a flush here, the captured post-write cursor position won't be guaranteed.
-      self.stream.flush()
+      self._stream.flush()
       # Capture the cursor location after the line label as our future starting point for writes.
-      self._display_map[i] = self.get_proper_location()
-      self.stream.write('\n')
+      self._display_map[i] = self._term.get_proper_location()
+      self._stream.write('\n')
 
   def _write_line(self, pos, line):
     """Writes a line to the worker swimlane given an index position.
@@ -70,33 +73,33 @@ class ParallelConsole(Terminal):
     :param int pos: The index position to write to.
     :param string line: The line to display at the index position.
     """
-    with self.location(*self._display_map[pos]):
-      self.stream.write(line.ljust(self.width - 10))
-      self.stream.flush()
+    with self._term.location(*self._display_map[pos]):
+      self._stream.write(line.ljust(self._term.width - 10))
+      self._stream.flush()
 
   def _ensure_newline(self):
     """Ensures a clean start on a non-indented line."""
-    if self.get_proper_column() != 0:
-      self.stream.write('\n')
+    if self._term.get_proper_column() != 0:
+      self._stream.write('\n')
 
   def _set_initial_position(self):
     """Sets the initial position of the cursor before drawing."""
     # We reverse this because the inputs to Terminal.move() differ from Terminal.location(). This
     # is used with the former (which is permanent) whereas most other output uses the latter.
-    self._initial_position = reversed(self.get_proper_location())
+    self._initial_position = reversed(self._term.get_proper_location())
 
   def _reset_to_initial_position(self):
     """Clears the terminal back to the original position."""
-    self.stream.write(self.move(*self._initial_position))   # Move to initial position.
-    self.stream.write(self.clear_eos)                       # Clear to end of screen.
-    self.stream.flush()
+    self._stream.write(self._term.move(*self._initial_position))   # Move to initial position.
+    self._stream.write(self._term.clear_eos)                 # Clear to end of screen.
+    self._stream.flush()
 
   def _get_status_glyph(self, success):
     """Returns a glyph appropriate for prefixing a status summary line based on success/failure.
 
     :param bool success: True if success, False if not.
     """
-    return self.bright_green('✓') if success else self.bright_red('✗')
+    return self._term.bright_green('✓') if success else self._term.bright_red('✗')
 
   def _start(self):
     """Starts the console display."""
@@ -104,17 +107,17 @@ class ParallelConsole(Terminal):
     self._summary = None
     self._ensure_newline()
     self._set_initial_position()
-    self.stream.write(self.hide_cursor)
+    self._stream.write(self._term.hide_cursor)
     self._initialize_swimlanes(self._workers)
 
   def _stop(self):
     """Stops the console display."""
     self._display_map = None
-    self.stream.write(self.normal_cursor)
+    self._stream.write(self._term.normal_cursor)
     if self._summary:
       success, summary = self._summary
       self._reset_to_initial_position()
-      self.stream.write('{}{} {}'.format(self.padding, self._get_status_glyph(success), summary))
+      self._stream.write('{}{} {}'.format(self.padding, self._get_status_glyph(success), summary))
       self._ensure_newline()
 
   @contextmanager
@@ -164,3 +167,7 @@ class ParallelConsole(Terminal):
     :param string activity: The worker activity.
     """
     self._write_line(worker, activity)
+
+  def clear(self):
+    """Clears the screen."""
+    print(self._term.clear, end='')
