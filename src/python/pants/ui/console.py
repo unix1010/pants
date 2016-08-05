@@ -14,13 +14,15 @@ from blessed import Terminal
 
 
 class ProperTerminal(Terminal):
+  """A Terminal with modified location fetching."""
+
   def get_proper_column(self):
-    """Retrieves the cursor column location with an offset appropriate for use with Terminal.location().
+    """Retrieves the cursor column location with an offset suitable for use with Terminal.location().
     """
     return self.get_proper_location()[1]
 
   def get_proper_location(self):
-    """Retrieves the cursor location with an offset appropriate for use with Terminal.location()."""
+    """Retrieves the cursor location with an offset suitable for use with Terminal.location()."""
     y, x = self.get_location()
     return (x - 1, y - 1)
 
