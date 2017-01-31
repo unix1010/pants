@@ -185,3 +185,6 @@ ffibuilder.cdef('''
 
 # NB: We set no source, because we don't actually have a header for the rust code.
 ffibuilder.set_source("_my_example", "")
+
+if __name__ == "__main__":
+  ffibuilder.compile()
