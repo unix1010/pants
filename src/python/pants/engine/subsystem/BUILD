@@ -16,6 +16,14 @@ python_library(
   ]
 )
 
+python_library(
+  name='bootstrap',
+  sources=['bootstrap.py'],
+  dependencies=[
+    '3rdparty/python:cffi',
+  ],
+)
+
 resources(
   name='native_engine_version',
   sources=['native_engine_version']
