@@ -12,9 +12,6 @@ import cffi
 from pants.util.contextutil import temporary_dir
 from pants.util.fileutil import atomic_copy
 
-
-ffibuilder = cffi.FFI()
-
 TYPEDEFS = '''
     typedef uint64_t   Id;
     typedef void*      Handle;
@@ -185,30 +182,35 @@ HEADER = '''
 
 BINARY_NAME = '_native_engine'
 
-ffibuilder.cdef(TYPEDEFS + '''
-    extern "Python" Key              extern_key_for(ExternContext*, Value*);
-    extern "Python" Value            extern_val_for(ExternContext*, Key*);
-    extern "Python" Value            extern_clone_val(ExternContext*, Value*);
-    extern "Python" void             extern_drop_handles(ExternContext*, Handle*, uint64_t);
-    extern "Python" Buffer           extern_id_to_str(ExternContext*, Id);
-    extern "Python" Buffer           extern_val_to_str(ExternContext*, Value*);
-    extern "Python" _Bool            extern_satisfied_by(ExternContext*, TypeConstraint*, TypeId*);
-    extern "Python" Value            extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
-    extern "Python" Value            extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
-    extern "Python" RawStats         extern_lift_directory_listing(ExternContext*, Value*);
-    extern "Python" Value            extern_project(ExternContext*, Value*, Field*, TypeId*);
-    extern "Python" ValueBuffer      extern_project_multi(ExternContext*, Value*, Field*);
-    extern "Python" Value            extern_create_exception(ExternContext*, uint8_t*, uint64_t);
-    extern "Python" RunnableComplete extern_invoke_runnable(ExternContext*, Function*, Value*, uint64_t, _Bool);
-    ''')
-
 if __name__ == '__main__':
+  """Define and compile the static functions that will later be filled in by `@ffi.def_extern`."""
+
+  ffibuilder = cffi.FFI()
+
+  ffibuilder.cdef(TYPEDEFS + '''
+      extern "Python" Key              extern_key_for(ExternContext*, Value*);
+      extern "Python" Value            extern_val_for(ExternContext*, Key*);
+      extern "Python" Value            extern_clone_val(ExternContext*, Value*);
+      extern "Python" void             extern_drop_handles(ExternContext*, Handle*, uint64_t);
+      extern "Python" Buffer           extern_id_to_str(ExternContext*, Id);
+      extern "Python" Buffer           extern_val_to_str(ExternContext*, Value*);
+      extern "Python" _Bool            extern_satisfied_by(ExternContext*, TypeConstraint*, TypeId*);
+      extern "Python" Value            extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
+      extern "Python" Value            extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
+      extern "Python" RawStats         extern_lift_directory_listing(ExternContext*, Value*);
+      extern "Python" Value            extern_project(ExternContext*, Value*, Field*, TypeId*);
+      extern "Python" ValueBuffer      extern_project_multi(ExternContext*, Value*, Field*);
+      extern "Python" Value            extern_create_exception(ExternContext*, uint8_t*, uint64_t);
+      extern "Python" RunnableComplete extern_invoke_runnable(ExternContext*, Function*, Value*, uint64_t, _Bool);
+      ''')
+
   # TODO: Can't use `__file__`, because this code runs inside a pex chroot.
   build_root = os.getcwd()
   with temporary_dir() as tmpdir:
     ffibuilder.set_source(
         BINARY_NAME,
         TYPEDEFS + HEADER,
+        # TODO: This doesn't need to be present.
         library_dirs=[os.path.join(build_root, 'src/rust/engine/target/release')],
         libraries=['engine'],
       )
