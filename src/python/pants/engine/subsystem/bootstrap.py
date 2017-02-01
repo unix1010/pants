@@ -1,8 +1,16 @@
+# coding=utf-8
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
 import cffi
+
 
 ffibuilder = cffi.FFI()
 
-ffibuilder.cdef('''
+TYPEDEFS = '''
     typedef uint64_t   Id;
     typedef void*      Handle;
 
@@ -55,42 +63,12 @@ ffibuilder.cdef('''
 
     typedef struct {
       Value  value;
-      bool   is_throw;
+      _Bool   is_throw;
     } RunnableComplete;
 
     typedef uint64_t EntryId;
 
     typedef void ExternContext;
-
-    extern "Python" Key              extern_key_for(ExternContext*, Value*);
-    extern "Python" Value            extern_val_for(ExternContext*, Key*);
-    extern "Python" Value            extern_clone_val(ExternContext*, Value*);
-    extern "Python" void             extern_drop_handles(ExternContext*, Handle*, uint64_t);
-    extern "Python" Buffer           extern_id_to_str(ExternContext*, Id);
-    extern "Python" Buffer           extern_val_to_str(ExternContext*, Value*);
-    extern "Python" bool             extern_satisfied_by(ExternContext*, TypeConstraint*, TypeId*);
-    extern "Python" Value            extern_store_list(ExternContext*, Value**, uint64_t, bool);
-    extern "Python" Value            extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
-    extern "Python" RawStats         extern_lift_directory_listing(ExternContext*, Value*);
-    extern "Python" Value            extern_project(ExternContext*, Value*, Field*, TypeId*);
-    extern "Python" ValueBuffer      extern_project_multi(ExternContext*, Value*, Field*);
-    extern "Python" Value            extern_create_exception(ExternContext*, uint8_t*, uint64_t);
-    extern "Python" RunnableComplete extern_invoke_runnable(ExternContext*, Function*, Value*, uint64_t, bool);
-
-    typedef Key              (*extern_ptr_key_for)(ExternContext*, Value*);
-    typedef Value            (*extern_ptr_val_for)(ExternContext*, Key*);
-    typedef Value            (*extern_ptr_clone_val)(ExternContext*, Value*);
-    typedef void             (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
-    typedef Buffer           (*extern_ptr_id_to_str)(ExternContext*, Id);
-    typedef Buffer           (*extern_ptr_val_to_str)(ExternContext*, Value*);
-    typedef bool             (*extern_ptr_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
-    typedef Value            (*extern_ptr_store_list)(ExternContext*, Value**, uint64_t, bool);
-    typedef Value            (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
-    typedef RawStats         (*extern_ptr_lift_directory_listing)(ExternContext*, Value*);
-    typedef Value            (*extern_ptr_project)(ExternContext*, Value*, Field*, TypeId*);
-    typedef ValueBuffer      (*extern_ptr_project_multi)(ExternContext*, Value*, Field*);
-    typedef Value            (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
-    typedef RunnableComplete (*extern_ptr_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
 
     typedef void RawScheduler;
 
@@ -113,6 +91,23 @@ ffibuilder.cdef('''
       // ignore them because we never have collections of this type.
     } RawNodes;
 
+    typedef Key              (*extern_ptr_key_for)(ExternContext*, Value*);
+    typedef Value            (*extern_ptr_val_for)(ExternContext*, Key*);
+    typedef Value            (*extern_ptr_clone_val)(ExternContext*, Value*);
+    typedef void             (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
+    typedef Buffer           (*extern_ptr_id_to_str)(ExternContext*, Id);
+    typedef Buffer           (*extern_ptr_val_to_str)(ExternContext*, Value*);
+    typedef _Bool            (*extern_ptr_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
+    typedef Value            (*extern_ptr_store_list)(ExternContext*, Value**, uint64_t, _Bool);
+    typedef Value            (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+    typedef RawStats         (*extern_ptr_lift_directory_listing)(ExternContext*, Value*);
+    typedef Value            (*extern_ptr_project)(ExternContext*, Value*, Field*, TypeId*);
+    typedef ValueBuffer      (*extern_ptr_project_multi)(ExternContext*, Value*, Field*);
+    typedef Value            (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
+    typedef RunnableComplete (*extern_ptr_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, _Bool);
+'''
+
+HEADER = '''
     RawScheduler* scheduler_create(ExternContext*,
                                    extern_ptr_key_for,
                                    extern_ptr_val_for,
@@ -159,7 +154,7 @@ ffibuilder.cdef('''
     void task_add_select(RawScheduler*, TypeConstraint);
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, _Bool);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
     void task_end(RawScheduler*);
 
@@ -176,15 +171,37 @@ ffibuilder.cdef('''
                                                 TypeConstraint,
                                                 TypeConstraint,
                                                 Field,
-                                                bool);
+                                                _Bool);
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
     void nodes_destroy(RawNodes*);
+'''
+
+ffibuilder.cdef(TYPEDEFS + '''
+    extern "Python" Key              extern_key_for(ExternContext*, Value*);
+    extern "Python" Value            extern_val_for(ExternContext*, Key*);
+    extern "Python" Value            extern_clone_val(ExternContext*, Value*);
+    extern "Python" void             extern_drop_handles(ExternContext*, Handle*, uint64_t);
+    extern "Python" Buffer           extern_id_to_str(ExternContext*, Id);
+    extern "Python" Buffer           extern_val_to_str(ExternContext*, Value*);
+    extern "Python" _Bool            extern_satisfied_by(ExternContext*, TypeConstraint*, TypeId*);
+    extern "Python" Value            extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
+    extern "Python" Value            extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
+    extern "Python" RawStats         extern_lift_directory_listing(ExternContext*, Value*);
+    extern "Python" Value            extern_project(ExternContext*, Value*, Field*, TypeId*);
+    extern "Python" ValueBuffer      extern_project_multi(ExternContext*, Value*, Field*);
+    extern "Python" Value            extern_create_exception(ExternContext*, uint8_t*, uint64_t);
+    extern "Python" RunnableComplete extern_invoke_runnable(ExternContext*, Function*, Value*, uint64_t, _Bool);
     ''')
 
-# NB: We set no source, because we don't actually have a header for the rust code.
-ffibuilder.set_source("_my_example", "")
+ffibuilder.set_source(
+    '_native_engine',
+    TYPEDEFS + HEADER,
+    libraries_dir=['src/rust/engine/target/release'],
+    libraries=['engine'],
+  )
 
-if __name__ == "__main__":
-  ffibuilder.compile()
+if __name__ == '__main__':
+  # TODO: Can't use `__file__`, because this code runs inside a pex chroot.
+  ffibuilder.compile(tmpdir='src/python/pants/engine/subsystem', verbose=True)

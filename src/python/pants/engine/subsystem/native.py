@@ -9,7 +9,6 @@ import threading
 
 import pkg_resources
 import six
-from cffi import FFI
 
 from pants.base.project_tree import Dir, File, Link
 from pants.binaries.binary_util import BinaryUtil
@@ -17,234 +16,65 @@ from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
+from pants.engine.subsystem._native_engine import ffi, lib
 
 
-_FFI = FFI()
-_FFI.cdef(
-    '''
-    typedef uint64_t   Id;
-    typedef void*      Handle;
-
-    typedef struct {
-      Id id_;
-    } TypeId;
-
-    typedef struct {
-      Id id_;
-    } TypeConstraint;
-
-    typedef struct {
-      Id id_;
-    } Function;
-
-    typedef struct {
-      Handle   handle;
-      TypeId   type_id;
-    } Value;
-
-    typedef struct {
-      Id       id_;
-      TypeId   type_id;
-    } Key;
-
-    typedef Key Field;
-
-    typedef struct {
-      uint8_t*  bytes_ptr;
-      uint64_t  bytes_len;
-      Value     handle_;
-    } Buffer;
-
-    typedef struct {
-      Value*     values_ptr;
-      uint64_t   values_len;
-      Value      handle_;
-    } ValueBuffer;
-
-    typedef struct {
-      Buffer       path;
-      uint8_t      tag;
-    } RawStat;
-
-    typedef struct {
-      RawStat*     stats_ptr;
-      uint64_t     stats_len;
-      Value        _value;
-    } RawStats;
-
-    typedef struct {
-      Value  value;
-      bool   is_throw;
-    } RunnableComplete;
-
-    typedef uint64_t EntryId;
-
-    typedef void ExternContext;
-
-    typedef Key              (*extern_key_for)(ExternContext*, Value*);
-    typedef Value            (*extern_val_for)(ExternContext*, Key*);
-    typedef Value            (*extern_clone_val)(ExternContext*, Value*);
-    typedef void             (*extern_drop_handles)(ExternContext*, Handle*, uint64_t);
-    typedef Buffer           (*extern_id_to_str)(ExternContext*, Id);
-    typedef Buffer           (*extern_val_to_str)(ExternContext*, Value*);
-    typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
-    typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
-    typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
-    typedef RawStats         (*extern_lift_directory_listing)(ExternContext*, Value*);
-    typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
-    typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
-    typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
-    typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
-
-    typedef void RawScheduler;
-
-    typedef struct {
-      uint64_t runnable_count;
-      uint64_t scheduling_iterations;
-    } ExecutionStat;
-
-    typedef struct {
-      Key             subject;
-      TypeConstraint  product;
-      uint8_t         state_tag;
-      Value           state_value;
-    } RawNode;
-
-    typedef struct {
-      RawNode*  nodes_ptr;
-      uint64_t  nodes_len;
-      // NB: there are more fields in this struct, but we can safely (?)
-      // ignore them because we never have collections of this type.
-    } RawNodes;
-
-    RawScheduler* scheduler_create(ExternContext*,
-                                   extern_key_for,
-                                   extern_val_for,
-                                   extern_clone_val,
-                                   extern_drop_handles,
-                                   extern_id_to_str,
-                                   extern_val_to_str,
-                                   extern_satisfied_by,
-                                   extern_store_list,
-                                   extern_store_bytes,
-                                   extern_lift_directory_listing,
-                                   extern_project,
-                                   extern_project_multi,
-                                   extern_create_exception,
-                                   extern_invoke_runnable,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Function,
-                                   Function,
-                                   Function,
-                                   Function,
-                                   Function,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint,
-                                   TypeConstraint);
-    void scheduler_destroy(RawScheduler*);
-
-    void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
-    void singleton_task_add(RawScheduler*, Function, TypeConstraint);
-
-    void task_add(RawScheduler*, Function, TypeConstraint);
-    void task_add_select(RawScheduler*, TypeConstraint);
-    void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
-    void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
-    void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
-    void task_end(RawScheduler*);
-
-    uint64_t graph_len(RawScheduler*);
-    uint64_t graph_invalidate(RawScheduler*, Key*, uint64_t);
-    void graph_visualize(RawScheduler*, char*);
-    void graph_trace(RawScheduler*, char*);
-
-
-    void execution_reset(RawScheduler*);
-    void execution_add_root_select(RawScheduler*, Key, TypeConstraint);
-    void execution_add_root_select_dependencies(RawScheduler*,
-                                                Key,
-                                                TypeConstraint,
-                                                TypeConstraint,
-                                                Field,
-                                                bool);
-    ExecutionStat execution_execute(RawScheduler*);
-    RawNodes* execution_roots(RawScheduler*);
-
-    void nodes_destroy(RawNodes*);
-    '''
-  )
-
-
-@_FFI.callback("Key(ExternContext*, Value*)")
+@ffi.def_extern()
 def extern_key_for(context_handle, val):
   """Return a Key for a Value."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   return c.value_to_key(val)
 
 
-@_FFI.callback("Value(ExternContext*, Key*)")
+@ffi.def_extern()
 def extern_val_for(context_handle, key):
   """Return a Value for a Key."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   return c.key_to_value(key)
 
 
-@_FFI.callback("Value(ExternContext*, Value*)")
+@ffi.def_extern()
 def extern_clone_val(context_handle, val):
   """Clone the given Value."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   item = c.from_value(val)
   return c.to_value(item, type_id=val.type_id)
 
 
-@_FFI.callback("void(ExternContext*, Handle*, uint64_t)")
+@ffi.def_extern()
 def extern_drop_handles(context_handle, handles_ptr, handles_len):
   """Drop the given Handles."""
-  c = _FFI.from_handle(context_handle)
-  handles = _FFI.unpack(handles_ptr, handles_len)
+  c = ffi.from_handle(context_handle)
+  handles = ffi.unpack(handles_ptr, handles_len)
   c.drop_handles(handles)
 
 
-@_FFI.callback("Buffer(ExternContext*, Id)")
+@ffi.def_extern()
 def extern_id_to_str(context_handle, id_):
   """Given an Id for `obj`, write str(obj) and return it."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   return c.utf8_buf(six.text_type(c.from_id(id_)))
 
 
-@_FFI.callback("Buffer(ExternContext*, Value*)")
+@ffi.def_extern()
 def extern_val_to_str(context_handle, val):
   """Given a Value for `obj`, write str(obj) and return it."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   return c.utf8_buf(six.text_type(c.from_value(val)))
 
 
-@_FFI.callback("bool(ExternContext*, TypeConstraint*, TypeId*)")
+@ffi.def_extern()
 def extern_satisfied_by(context_handle, constraint_id, cls_id):
   """Given two TypeIds, return constraint.satisfied_by(cls)."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
 
 
-@_FFI.callback("Value(ExternContext*, Value**, uint64_t, bool)")
+@ffi.def_extern()
 def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
   """Given storage and an array of Values, return a new Value to represent the list."""
-  c = _FFI.from_handle(context_handle)
-  vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr_ptr, vals_len))
+  c = ffi.from_handle(context_handle)
+  vals = tuple(c.from_value(val) for val in ffi.unpack(vals_ptr_ptr, vals_len))
   if merge:
     # Expect each obj to represent a list, and do a de-duping merge.
     merged_set = set()
@@ -259,21 +89,21 @@ def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
   return c.to_value(vals)
 
 
-@_FFI.callback("Value(ExternContext*, uint8_t*, uint64_t)")
+@ffi.def_extern()
 def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
   """Given a context and raw bytes, return a new Value to represent the content."""
-  c = _FFI.from_handle(context_handle)
-  return c.to_value(bytes(_FFI.buffer(bytes_ptr, bytes_len)))
+  c = ffi.from_handle(context_handle)
+  return c.to_value(bytes(ffi.buffer(bytes_ptr, bytes_len)))
 
 
-@_FFI.callback("RawStats(ExternContext*, Value*)")
+@ffi.def_extern()
 def extern_lift_directory_listing(context_handle, directory_listing_val):
   """Given a context and a Value representing a DirectoryListing, return RawStats."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   directory_listing = c.from_value(directory_listing_val)
 
   raw_stats_len = len(directory_listing.dependencies)
-  raw_stats = _FFI.new('RawStat[]', raw_stats_len)
+  raw_stats = ffi.new('RawStat[]', raw_stats_len)
   for i, stat in enumerate(directory_listing.dependencies):
     raw_stats[i].path = c.buf(stat.path)
     if type(stat) == Dir:
@@ -288,10 +118,10 @@ def extern_lift_directory_listing(context_handle, directory_listing_val):
   return (raw_stats, raw_stats_len, c.to_value(raw_stats, type_id=c.bytes_id))
 
 
-@_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
+@ffi.def_extern()
 def extern_project(context_handle, val, field, type_id):
   """Given a Value for `obj`, a field name, and a type, project the field as a new Value."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   obj = c.from_value(val)
   field_name = c.from_key(field)
   typ = c.from_id(type_id.id_)
@@ -303,30 +133,30 @@ def extern_project(context_handle, val, field, type_id):
   return c.to_value(projected)
 
 
-@_FFI.callback("ValueBuffer(ExternContext*, Value*, Field*)")
+@ffi.def_extern()
 def extern_project_multi(context_handle, val, field):
   """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   obj = c.from_value(val)
   field_name = c.from_key(field)
 
   return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
 
 
-@_FFI.callback("Value(ExternContext*, uint8_t*, uint64_t)")
+@ffi.def_extern()
 def extern_create_exception(context_handle, msg_ptr, msg_len):
   """Given a utf8 message string, create an Exception object."""
-  c = _FFI.from_handle(context_handle)
-  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+  c = ffi.from_handle(context_handle)
+  msg = bytes(ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
   return c.to_value(Exception(msg))
 
 
-@_FFI.callback("RunnableComplete(ExternContext*, Function*, Value*, uint64_t, bool)")
+@ffi.def_extern()
 def extern_invoke_runnable(context_handle, func, args_ptr, args_len, cacheable):
   """Given a destructured rawRunnable, run it."""
-  c = _FFI.from_handle(context_handle)
+  c = ffi.from_handle(context_handle)
   runnable = c.from_id(func.id_)
-  args = tuple(c.from_value(arg) for arg in _FFI.unpack(args_ptr, args_len))
+  args = tuple(c.from_value(arg) for arg in ffi.unpack(args_ptr, args_len))
 
   try:
     val = runnable(*args)
@@ -374,7 +204,7 @@ class ExternContext(object):
   def __init__(self):
     # A handle to this object to ensure that the native wrapper survives at least as
     # long as this object.
-    self.handle = _FFI.new_handle(self)
+    self.handle = ffi.new_handle(self)
 
     # The native code will invoke externs concurrently, so locking is needed around
     # datastructures in this context.
@@ -393,24 +223,24 @@ class ExternContext(object):
     self._handles = set()
 
   def buf(self, bytestring):
-    buf = _FFI.new('uint8_t[]', bytestring)
+    buf = ffi.new('uint8_t[]', bytestring)
     return (buf, len(bytestring), self.to_value(buf, type_id=self.anon_id))
 
   def utf8_buf(self, string):
     return self.buf(string.encode('utf-8'))
 
   def vals_buf(self, keys):
-    buf = _FFI.new('Value[]', keys)
+    buf = ffi.new('Value[]', keys)
     return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
 
   def to_value(self, obj, type_id=None):
-    handle = _FFI.new_handle(obj)
+    handle = ffi.new_handle(obj)
     self._handles.add(handle)
     type_id = type_id or TypeId(self.to_id(type(obj)))
     return Value(handle, type_id)
 
   def from_value(self, val):
-    return _FFI.from_handle(val.handle)
+    return ffi.from_handle(val.handle)
 
   def drop_handles(self, handles):
     self._handles -= set(handles)
@@ -503,34 +333,35 @@ class Native(object):
 
   @memoized_property
   def lib(self):
-    """Load and return the `libgraph` module."""
+    """Load and return the `native-engine` module."""
     binary = self._binary_util.select_binary(self._supportdir,
-                                              self._version,
-                                              'native-engine')
-    return _FFI.dlopen(binary)
+                                             self._version,
+                                             'native-engine')
+    ffi.dlopen(binary)
+    return lib
 
   @memoized_property
   def context(self):
     # We statically initialize a ExternContext to correspond to the queue of dropped
     # Handles that the native code maintains.
-    return _FFI.init_once(ExternContext, 'ExternContext singleton')
+    return ffi.init_once(ExternContext, 'ExternContext singleton')
 
   def new(self, cdecl, init):
-    return _FFI.new(cdecl, init)
+    return ffi.new(cdecl, init)
 
   def gc(self, cdata, destructor):
     """Register a method to be called when `cdata` is garbage collected.
 
     Returns a new reference that should be used in place of `cdata`.
     """
-    return _FFI.gc(cdata, destructor)
+    return ffi.gc(cdata, destructor)
 
   def unpack(self, cdata_ptr, count):
     """Given a pointer representing an array, and its count of entries, return a list."""
-    return _FFI.unpack(cdata_ptr, count)
+    return ffi.unpack(cdata_ptr, count)
 
   def buffer(self, cdata):
-    return _FFI.buffer(cdata)
+    return ffi.buffer(cdata)
 
   def new_scheduler(self,
                     construct_snapshot,

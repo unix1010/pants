@@ -16,9 +16,9 @@ python_library(
   ]
 )
 
-python_library(
+python_binary(
   name='bootstrap',
-  sources=['bootstrap.py'],
+  source='bootstrap.py',
   dependencies=[
     '3rdparty/python:cffi',
   ],
