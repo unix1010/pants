@@ -335,11 +335,7 @@ class Native(object):
 
   @memoized_property
   def lib(self):
-    """Load and return the `native-engine` module.
-
-    TODO: There is another (compiled) module here named `_native_engine`, which is a Python
-    module defining function pointers.
-    """
+    """Return the `native-engine` module."""
     return lib
 
   @memoized_property
