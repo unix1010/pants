@@ -469,8 +469,8 @@ impl Graph {
     }
 
     // Get or create the destination, and then insert the dep.
-    // TODO: doing cycle detection under the writelock... unfortunate, but probably unavoidable
-    // without a much more complicated algorithm.
+    // TODO: doing cycle detection under the writelock... unfortunate.
+    //   see https://arxiv.org/pdf/1611.03947.pdf maybe?
     {
       let mut inner = self.inner.write().unwrap();
       let dst_id = inner.ensure_entry(context, dst_node.clone());
