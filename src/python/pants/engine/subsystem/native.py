@@ -17,7 +17,6 @@ from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
-from pants.engine.subsystem.bootstrap import TYPEDEFS, HEADER
 from pants.engine.subsystem._native_engine import ffi, lib
 
 
