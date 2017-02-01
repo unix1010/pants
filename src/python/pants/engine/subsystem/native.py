@@ -340,10 +340,7 @@ class Native(object):
     TODO: There is another (compiled) module here named `_native_engine`, which is a Python
     module defining function pointers.
     """
-    binary = self._binary_util.select_binary(self._supportdir,
-                                             self._version,
-                                             'native-engine')
-    return ffi.dlopen(binary)
+    return lib
 
   @memoized_property
   def context(self):

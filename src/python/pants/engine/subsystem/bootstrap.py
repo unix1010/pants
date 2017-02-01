@@ -181,9 +181,13 @@ HEADER = '''
 '''
 
 BINARY_NAME = '_native_engine'
+BINARY_ENGINE_NAME = 'engine'
 
 if __name__ == '__main__':
   """Define and compile the static functions that will later be filled in by `@ffi.def_extern`."""
+
+  binary_filename = '{}.so'.format(BINARY_NAME)
+  engine_binary_filename = 'lib{}.so'.format(BINARY_ENGINE_NAME)
 
   ffibuilder = cffi.FFI()
 
@@ -207,15 +211,19 @@ if __name__ == '__main__':
   # TODO: Can't use `__file__`, because this code runs inside a pex chroot.
   build_root = os.getcwd()
   with temporary_dir() as tmpdir:
+    # Copy the engine binary into the temporary build directory.
+    atomic_copy(os.path.join(build_root, 'src/rust/engine/target/release', binary_engine_filename),
+                os.path.join(tmpdir, binary_engine_filename))
+
+    # Compile against the engine binary.
     ffibuilder.set_source(
         BINARY_NAME,
         TYPEDEFS + HEADER,
-        library_dirs=[os.path.join(build_root, 'src/rust/engine/target/release')],
-        libraries=['engine'],
+        libraries=[BINARY_ENGINE_NAME],
       )
     ffibuilder.compile(tmpdir=tmpdir, verbose=True)
 
-    binary_filename = '{}.so'.format(BINARY_NAME)
-
-    atomic_copy(os.path.join(tmpdir, binary_filename),
-                os.path.join(build_root, 'src/python/pants/engine/subsystem', binary_filename))
+    # Copy both binaries to the dest.
+    for filename in (binary_filename, engine_binary_filename):
+      atomic_copy(os.path.join(tmpdir, filename),
+                  os.path.join(build_root, 'src/python/pants/engine/subsystem', filename))
