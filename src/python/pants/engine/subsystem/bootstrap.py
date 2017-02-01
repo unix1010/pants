@@ -5,7 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 import cffi
+
+from pants.util.contextutil import temporary_dir
+from pants.util.fileutil import atomic_copy
 
 
 ffibuilder = cffi.FFI()
@@ -178,6 +183,8 @@ HEADER = '''
     void nodes_destroy(RawNodes*);
 '''
 
+BINARY_NAME = '_native_engine'
+
 ffibuilder.cdef(TYPEDEFS + '''
     extern "Python" Key              extern_key_for(ExternContext*, Value*);
     extern "Python" Value            extern_val_for(ExternContext*, Key*);
@@ -195,13 +202,19 @@ ffibuilder.cdef(TYPEDEFS + '''
     extern "Python" RunnableComplete extern_invoke_runnable(ExternContext*, Function*, Value*, uint64_t, _Bool);
     ''')
 
-ffibuilder.set_source(
-    '_native_engine',
-    TYPEDEFS + HEADER,
-    libraries_dir=['src/rust/engine/target/release'],
-    libraries=['engine'],
-  )
-
 if __name__ == '__main__':
   # TODO: Can't use `__file__`, because this code runs inside a pex chroot.
-  ffibuilder.compile(tmpdir='src/python/pants/engine/subsystem', verbose=True)
+  build_root = os.getcwd()
+  with temporary_dir() as tmpdir:
+    ffibuilder.set_source(
+        BINARY_NAME,
+        TYPEDEFS + HEADER,
+        library_dirs=[os.path.join(build_root, 'src/rust/engine/target/release')],
+        libraries=['engine'],
+      )
+    ffibuilder.compile(tmpdir=tmpdir, verbose=True)
+
+    binary_filename = '{}.so'.format(BINARY_NAME)
+
+    atomic_copy(os.path.join(tmpdir, binary_filename),
+                os.path.join(build_root, 'src/python/pants/engine/subsystem', binary_filename))

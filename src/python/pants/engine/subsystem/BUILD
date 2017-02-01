@@ -21,6 +21,8 @@ python_binary(
   source='bootstrap.py',
   dependencies=[
     '3rdparty/python:cffi',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:fileutil',
   ],
 )
 
