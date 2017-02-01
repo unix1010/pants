@@ -187,7 +187,7 @@ if __name__ == '__main__':
 
   ffibuilder = cffi.FFI()
 
-  ffibuilder.cdef(TYPEDEFS + '''
+  ffibuilder.cdef(TYPEDEFS + HEADER + '''
       extern "Python" Key              extern_key_for(ExternContext*, Value*);
       extern "Python" Value            extern_val_for(ExternContext*, Key*);
       extern "Python" Value            extern_clone_val(ExternContext*, Value*);
@@ -210,7 +210,6 @@ if __name__ == '__main__':
     ffibuilder.set_source(
         BINARY_NAME,
         TYPEDEFS + HEADER,
-        # TODO: This doesn't need to be present.
         library_dirs=[os.path.join(build_root, 'src/rust/engine/target/release')],
         libraries=['engine'],
       )

@@ -343,12 +343,7 @@ class Native(object):
     binary = self._binary_util.select_binary(self._supportdir,
                                              self._version,
                                              'native-engine')
-    # TODO: Docs say not to use a second FFI module.
-    ffi2 = cffi.FFI()
-
-    # Define the types that are exposed by the `native-engine` rust binary.
-    ffi2.cdef(TYPEDEFS + HEADER)
-    return ffi2.dlopen(binary)
+    return ffi.dlopen(binary)
 
   @memoized_property
   def context(self):
