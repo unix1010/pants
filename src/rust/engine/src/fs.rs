@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{atomic, RwLock, RwLockReadGuard};
+use std::sync::{atomic, Arc, Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
@@ -261,16 +261,8 @@ impl PathGlobs {
   }
 }
 
-#[derive(Debug)]
-struct PathGlobsExpansion<T: Sized> {
-  context: T,
-  // Globs that have yet to be expanded, in order.
-  todo: Vec<PathGlob>,
-  // Globs that have already been expanded.
-  completed: HashSet<PathGlob>,
-  // Unique Paths that have been matched, in order.
-  outputs: OrderMap<PathStat, ()>,
-}
+// Expanded PathGlobs, in order.
+type PathGlobsExpansion<E> = Arc<Mutex<OrderMap<PathGlob, future::Shared<BoxFuture<Vec<PathStat>, E>>>>>;
 
 pub struct PosixFS {
   build_root: Dir,
@@ -396,7 +388,7 @@ impl PosixFS {
 /**
  * A context for filesystem operations parameterized on an error type 'E'.
  */
-pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
+pub trait VFS<E: Clone + Send + Sync + 'static> : Clone + Send + Sync + 'static {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
   fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
@@ -525,52 +517,67 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       return future::ok(vec![]).boxed();
     }
 
-    let init =
-      PathGlobsExpansion {
-        context: self.clone(),
-        todo: path_globs,
-        completed: HashSet::default(),
-        outputs: OrderMap::default()
-      };
-    future::loop_fn(init, |mut expansion| {
-      // Request the expansion of all outstanding PathGlobs as a batch.
-      let round =
-        future::join_all({
-          let context = &expansion.context;
-          expansion.todo.drain(..)
-            .map(|path_glob| context.expand_single(path_glob))
-            .collect::<Vec<_>>()
-        });
-      round
-        .map(move |paths_and_globs| {
-          // Collect distinct new PathStats and PathGlobs
-          for (paths, globs) in paths_and_globs.into_iter() {
-            expansion.outputs.extend(paths.into_iter().map(|p| (p, ())));
-            let completed = &mut expansion.completed;
-            expansion.todo.extend(
-              globs.into_iter()
-                .filter(|pg| completed.insert(pg.clone()))
-            );
-          }
-
-          // If there were any new PathGlobs, continue the expansion.
-          if expansion.todo.is_empty() {
-            future::Loop::Break(expansion)
-          } else {
-            future::Loop::Continue(expansion)
-          }
-        })
-    })
-    .map(|expansion| {
-      assert!(
-        expansion.todo.is_empty(),
-        "Loop shouldn't have exited with work to do: {:?}",
-        expansion.todo,
+    // Execute recursively (with memoization) from each root.
+    let expansion = Arc::new(Mutex::new(OrderMap::default()));
+    let roots =
+      future::join_all(
+        path_globs.into_iter()
+          .map(|path_glob| self.expand_recursive(&expansion, path_glob))
+          .collect::<Vec<_>>()
       );
-      // Finally, capture the resulting PathStats from the expansion.
-      expansion.outputs.into_iter().map(|(k, _)| k).collect()
+
+    // NB: We ignore the return values here, and flatten the memoized outputs instead.
+    roots
+      .and_then(move |_| {
+        // Flatten and dedupe the output.
+        let outputs =
+          future::join_all({
+            let outputs = expansion.lock().unwrap();
+            outputs.iter()
+              .map(|(_, output)| output.clone())
+              .collect::<Vec<_>>()
+          });
+        outputs
+          .map(|value_vecs|
+            value_vecs.into_iter()
+              .flat_map(|values| values.clone())
+              .map(|v| (v, ()))
+              .collect::<OrderMap<PathStat, ()>>()
+              .into_iter()
+              .map(|(k, _)| k)
+              .collect::<Vec<PathStat>>()
+          )
+      })
+      .map_err(|e| e.clone())
+      .boxed()
+  }
+
+  /**
+   * Recursively expands a PathGlob into the given OrderMap.
+   */
+  fn expand_recursive(&self, expansion: &PathGlobsExpansion<E>, path_glob: PathGlob) -> future::Shared<BoxFuture<Vec<PathStat>, E>> {
+    expansion.lock().unwrap().entry(path_glob.clone()).or_insert_with(|| {
+      let context = self.clone();
+      let expansion = expansion.clone();
+      // Make the result lazy so that it isn't executed under the lock.
+      let res =
+        future::lazy(move ||
+          context.expand_single(path_glob)
+            .and_then(move |(paths, globs)| {
+              // Trigger recursion for the child PathGlobs of this PathGlob.
+              let children =
+                future::join_all(
+                  globs.into_iter()
+                    .map(|child| context.expand_recursive(&expansion, child))
+                    .collect::<Vec<_>>()
+                );
+              // But store only the resulting PathStats.
+              children.map(|_| paths).map_err(|e| e.clone())
+            })
+        );
+      res.boxed().shared()
     })
-    .boxed()
+    .clone()
   }
 
   /**
