@@ -19,17 +19,18 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.build_file_parser import BuildFileParser
-from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
+from pants.init.engine_initializer import EngineInitializer
+from pants.init.target_roots import LiteralTargetRoots
 from pants.init.util import clean_global_runtime_state
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
+from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class TestGenerator(object):
@@ -39,7 +40,7 @@ class TestGenerator(object):
   def generate_tests(cls):
     """Generate tests for a given class.
 
-    This should be called against the composing class in it's defining module, e.g.
+    This should be called against the composing class in its defining module, e.g.
 
       class ThingTest(TestGenerator):
         ...
@@ -70,7 +71,6 @@ class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot.
 
   :API: public
-
   """
 
   def build_path(self, relpath):
@@ -142,7 +142,7 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    return BuildFile(self.address_mapper._project_tree, relpath=self.build_path(relpath))
+    return BuildFile(self.project_tree, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',
@@ -204,6 +204,13 @@ class BaseTest(unittest.TestCase):
     return BuildFileAliases(targets={'target': Target})
 
   @property
+  def pants_ignore_patterns(self):
+    """
+    :API: public
+    """
+    return None
+
+  @property
   def build_ignore_patterns(self):
     """
     :API: public
@@ -246,9 +253,10 @@ class BaseTest(unittest.TestCase):
 
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
-    self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.project_tree = FileSystemProjectTree(self.build_root)
-    self.reset_build_graph()
+
+    self._build_graph = None
+    self._address_mapper = None
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -265,11 +273,38 @@ class BaseTest(unittest.TestCase):
           yield os.path.relpath(os.path.join(root, f), self.build_root)
     return set(scan())
 
+  def _initialize_engine(self):
+    graph_helper = EngineInitializer.setup_legacy_graph(
+        self.pants_ignore_patterns,
+        self.pants_workdir,
+        native=init_native(),
+        build_file_aliases=self.alias_groups,
+        build_ignore_patterns=self.build_ignore_patterns,
+        exclude_target_regexps=None,
+        subproject_roots=None,
+      )
+
+    self._build_graph, self._address_mapper = graph_helper.create_build_graph(
+        LiteralTargetRoots([]),
+        self.build_root,
+      )
+
+  @property
+  def address_mapper(self):
+    if self._address_mapper is None:
+      self._initialize_engine()
+    return self._address_mapper
+
+  @property
+  def build_graph(self):
+    if self._build_graph is None:
+      self._initialize_engine()
+    return self._build_graph
+
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
-                                                 build_ignore_patterns=self.build_ignore_patterns)
-    self.build_graph = MutableBuildGraph(address_mapper=self.address_mapper)
+    if self._build_graph is not None:
+      self._build_graph = self._build_graph.clone_new()
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)

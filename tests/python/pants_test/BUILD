@@ -37,7 +37,9 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/engine:util',
     'tests/python/pants_test/option/util',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

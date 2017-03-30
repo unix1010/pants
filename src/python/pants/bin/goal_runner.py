@@ -11,7 +11,6 @@ import sys
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.project_tree_factory import get_project_tree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.bin.engine_initializer import EngineInitializer
 from pants.bin.repro import Reproducer
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -23,6 +22,7 @@ from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
+from pants.init.engine_initializer import EngineInitializer
 from pants.init.pants_daemon_launcher import PantsDaemonLauncher
 from pants.init.target_roots import TargetRoots
 from pants.java.nailgun_executor import NailgunProcessGroup
