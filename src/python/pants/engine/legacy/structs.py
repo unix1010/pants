@@ -298,7 +298,7 @@ class BaseGlobs(Locatable, AbstractClass):
     # `follow_links=True` is the default behavior for wrapped globs, so we pop the old kwarg
     # and warn here to bridge the gap from v1->v2 BUILD files.
     follow_links = kwargs.pop('follow_links', None)
-    if follow_links is not None:
+    if follow_links is False:
       logger.warn(
         'Ignoring `follow_links={}` kwarg on glob. Default behavior is to follow all links.'
         .format(follow_links)
