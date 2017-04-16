@@ -13,6 +13,7 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 
+from pants.contrib.kythe.subsystems.kythe import Kythe
 from pants.contrib.kythe.tasks.indexable_java_targets import IndexableJavaTargets
 
 
@@ -29,7 +30,7 @@ class ExtractJava(JvmToolTaskMixin):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExtractJava, cls).subsystem_dependencies() + (JVM.scoped(cls),)
+    return super(ExtractJava, cls).subsystem_dependencies() + (JVM.scoped(cls), Kythe)
 
   @classmethod
   def product_types(cls):
@@ -59,6 +60,7 @@ class ExtractJava(JvmToolTaskMixin):
   def execute(self):
     indexable_targets = IndexableJavaTargets.get(self.context)
     targets_to_zinc_args = self.context.products.get_data('zinc_args')
+    corpus = Kythe.global_instance().get_options().corpus
 
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
       cp = self.tool_classpath('kythe-extractor')
@@ -67,7 +69,7 @@ class ExtractJava(JvmToolTaskMixin):
         javac_args = self._get_javac_args_from_zinc_args(targets_to_zinc_args[vt.target])
         jvm_options = list(JVM.scoped_instance(self).get_jvm_options())
         jvm_options.extend([
-          '-DKYTHE_CORPUS={}'.format(vt.target.address.spec),
+          '-DKYTHE_CORPUS={}'.format(corpus),
           '-DKYTHE_ROOT_DIRECTORY={}'.format(vt.target.target_base),
           '-DKYTHE_OUTPUT_DIRECTORY={}'.format(vt.results_dir)
         ])

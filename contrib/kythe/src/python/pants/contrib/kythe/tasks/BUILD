@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    'contrib/kythe/src/python/pants/contrib/kythe/subsystems',
     'src/python/pants/backend/jvm/subsystems:jvm',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
