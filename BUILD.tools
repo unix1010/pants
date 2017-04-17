@@ -35,3 +35,12 @@ jar_library(name = 'scrooge-linter',
               '3rdparty:thrift-0.6.1',
             ])
 
+target(name = 'scalac-plugin-dep', dependencies=[':scalahost-nsc'])
+
+# NB: This dependency is full-versioned to match the compiler, so we
+# might not be able to ship it with pants.
+jar_library(name = 'scalahost-nsc',
+            jars = [
+              # TODO: Intransitive because of https://github.com/scalameta/scalameta/issues/788
+              jar('org.scalameta', 'scalahost-nsc_2.11.10', '1.8.0-520-f6d600cd.1492126021620', intransitive=True),
+            ])

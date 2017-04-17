@@ -8,19 +8,23 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.jvm.subsystems.jvm import JVM
+from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
-from pants.contrib.kythe.subsystems.kythe import Kythe
 
-from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
+from pants.contrib.kythe.subsystems.kythe import Kythe
 
 
 class IndexScala(NailgunTask):
-  _SCALAMETA_INDEXER_MAIN = 'org.pantsbuild.scalameta.kythe.Indexer'
+  _SCALAMETA_INDEXER_PKG = 'org.pantsbuild.scalameta.kythe'
+  _SCALAMETA_INDEXER_MAIN = '{}.Indexer'.format(_SCALAMETA_INDEXER_PKG)
   _SCALAHOST_TOOL = 'scalahost-nsc'
 
   cache_target_dirs = True
@@ -45,15 +49,9 @@ class IndexScala(NailgunTask):
                           'kythe-scala-indexer',
                           classpath=[ScalaJarDependency('org.pantsbuild.scalameta.kythe',
                                                         'kythe-indexer',
-                                                        '1492363605')],
-                          main=cls._SCALAMETA_INDEXER_MAIN)
-    cls.register_jvm_tool(register,
-                          cls._SCALAHOST_TOOL,
-                          # NB: This dependency is full-versioned to match the compiler, so we
-                          # might not be able to ship it with pants.
-                          classpath=[JarDependency('org.scalameta',
-                                                   'scalahost-nsc_2.11.10',
-                                                   '1.8.0-520-f6d600cd.1492126021620')])
+                                                        '1492463491')])
+    # NB: No default, because this class is full-versioned.
+    cls.register_jvm_tool(register, cls._SCALAHOST_TOOL)
 
   @property
   def cache_target_dirs(self):
@@ -61,14 +59,14 @@ class IndexScala(NailgunTask):
 
   @memoized_property
   def _scalahost_nsc(self):
-    jars = self.tool_classpath(cls._SCALAHOST_TOOL)
+    jars = self.tool_classpath(self._SCALAHOST_TOOL)
     if len(jars) != 1:
       raise TaskError('Expected exactly one jar for the `{}` tool. Got: {}'.format(
-        cls._SCALAHOST_TOOL, jars))
+        self._SCALAHOST_TOOL, jars))
     return jars[0]
 
   def _is_indexed(self, target):
-    return ...
+    return isinstance(target, JvmTarget) and target.has_sources('.scala')
 
   def execute(self):
     def entries_file(_vt):
@@ -87,7 +85,7 @@ class IndexScala(NailgunTask):
     corpus = Kythe.global_instance().get_options().corpus
     self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
 
-    target_classpath = ClasspathUtils.classpath(target.closure(bfs=True))
+    target_classpath = ClasspathUtil.classpath(vt.target.closure(bfs=True), classpath_products)
     args = [
         '--classpath={}'.format(os.pathsep.join(target_classpath)),
         '--pluginpath={}'.format(self._scalahost_nsc),
