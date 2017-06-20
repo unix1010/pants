@@ -105,11 +105,10 @@ class CompileContext(object):
   and a finalized compile in its permanent location.
   """
 
-  def __init__(self, target, analysis_file, portable_analysis_file, classes_dir, jar_file,
+  def __init__(self, target, analysis_file, classes_dir, jar_file,
                log_file, zinc_args_file, sources, strict_deps):
     self.target = target
     self.analysis_file = analysis_file
-    self.portable_analysis_file = portable_analysis_file
     self.classes_dir = classes_dir
     self.jar_file = jar_file
     self.log_file = log_file

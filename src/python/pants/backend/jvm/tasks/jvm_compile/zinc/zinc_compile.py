@@ -22,10 +22,7 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
-from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
@@ -119,7 +116,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 5)]
+    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 6)]
 
   @classmethod
   def compiler_plugin_types(cls):
@@ -244,9 +241,18 @@ class BaseZincCompile(JvmCompile):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
-  def create_analysis_tools(self):
-    return AnalysisTools(self.dist.real_home, ZincAnalysisParser(), ZincAnalysis,
-                         get_buildroot(), self.get_options().pants_workdir)
+  @memoized_property
+  def _rebase_map_args(self):
+    """We rebase known stable paths in the analysis to make it portable across machines."""
+    rebases = {
+        self.dist.real_home: '/dev/null/java_home/',
+        get_buildroot(): '/dev/null/buildroot/',
+        self.get_options().pants_workdir: '/dev/null/workdir/',
+      }
+    return (
+        '-rebase-map',
+        ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
+      )
 
   def javac_classpath(self):
     # Note that if this classpath is empty then Zinc will automatically use the javac from
@@ -282,8 +288,8 @@ class BaseZincCompile(JvmCompile):
     """
     hasher = sha1()
     for tool in ['zinc', 'compiler-interface', 'compiler-bridge']:
-      hasher.update(os.path.relpath(self._zinc_tool_jar(tool),
-                                    self.get_options().pants_workdir))
+      for entry in self._zinc_tool_classpath(tool):
+        hasher.update(os.path.relpath(entry, self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
@@ -329,6 +335,8 @@ class BaseZincCompile(JvmCompile):
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
 
+    zinc_args.extend(self._rebase_map_args)
+
     zinc_args.extend(args)
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')
@@ -337,6 +345,9 @@ class BaseZincCompile(JvmCompile):
       zinc_args.extend(self.get_options().fatal_warnings_enabled_args)
     else:
       zinc_args.extend(self.get_options().fatal_warnings_disabled_args)
+
+    if not self._clear_invalid_analysis:
+      zinc_args.append('-no-clear-invalid-analysis')
 
     if not zinc_file_manager:
       zinc_args.append('-no-zinc-file-manager')
