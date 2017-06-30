@@ -2,6 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'dependency_context',
+  sources = ['dependency_context.py'],
+  dependencies = [
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/build_graph',
+    'src/python/pants/java/jar',
+  ],
+)
+
+python_library(
   name = 'jvm_tool_mixin',
   sources = ['jvm_tool_mixin.py'],
   dependencies = [

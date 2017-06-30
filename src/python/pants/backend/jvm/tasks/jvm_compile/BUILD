@@ -66,6 +66,7 @@ python_library(
     ':compile_context',
     ':execution_graph',
     ':missing_dependency_finder',
+    'src/python/pants/backend/jvm/subsystems:dependency_context',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',

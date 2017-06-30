@@ -13,18 +13,17 @@ from multiprocessing import cpu_count
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.dependency_context import (DependencyContext,
+                                                             ResolvedJarAwareFingerprintStrategy)
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
-from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
-                                                                 strict_dependencies)
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
@@ -33,10 +32,8 @@ from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyze
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
@@ -44,50 +41,6 @@ from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir
                                 safe_walk)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
-
-
-class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
-  """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
-
-  def __init__(self, classpath_products, dep_context):
-    super(ResolvedJarAwareFingerprintStrategy, self).__init__()
-    self._classpath_products = classpath_products
-    self._dep_context = dep_context
-
-  def compute_fingerprint(self, target):
-    if isinstance(target, Resources):
-      # Just do nothing, this kind of dependency shouldn't affect result's hash.
-      return None
-
-    hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint())
-    if isinstance(target, JarLibrary):
-      # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
-      # the resolved coordinates, and the requested coordinates are used. This ensures that if a
-      # source file depends on a library with source compatible but binary incompatible signature
-      # changes between versions, that you won't get runtime errors due to using an artifact built
-      # against a binary incompatible version resolved for a previous compile.
-      classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
-        [target])
-      for _, entry in classpath_entries:
-        hasher.update(str(entry.coordinate))
-    return hasher.hexdigest()
-
-  def direct(self, target):
-    if isinstance(target, JvmTarget):
-      return JvmCompile.strict_deps_enabled(target)
-    return False
-
-  def dependencies(self, target):
-    if self.direct(target):
-      return strict_dependencies(target, self._dep_context)
-    return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
-
-  def __hash__(self):
-    return hash(type(self))
-
-  def __eq__(self, other):
-    return type(self) == type(other)
 
 
 class JvmCompile(NailgunTaskBase):
@@ -368,34 +321,8 @@ class JvmCompile(NailgunTaskBase):
     return MissingDependencyFinder(self._dep_analyzer, CompileErrorExtractor(
       self.get_options().class_not_found_error_patterns))
 
-  @staticmethod
-  def _compute_language_property(target, selector):
-    """Computes a language property setting for the given target sources.
-
-    :param target The target whose language property will be calculated.
-    :param selector A function that takes a target or platform and returns the boolean value of the
-                    property for that target or platform, or None if that target or platform does
-                    not directly define the property.
-
-    If the target does not override the language property, returns true iff the property
-    is true for any of the matched languages for the target.
-    """
-    if selector(target) is not None:
-      return selector(target)
-
-    prop = False
-    if target.has_sources('.java'):
-      prop |= selector(Java.global_instance())
-    if target.has_sources('.scala'):
-      prop |= selector(ScalaPlatform.global_instance())
-    return prop
-
   def _fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareFingerprintStrategy(classpath_products, self._dep_context)
-
-  @staticmethod
-  def strict_deps_enabled(target):
-    return JvmCompile._compute_language_property(target, lambda x: x.strict_deps)
 
   def _compile_context(self, target, target_workdir):
     analysis_file = os.path.join(target_workdir, 'z.analysis')
@@ -403,7 +330,7 @@ class JvmCompile(NailgunTaskBase):
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
     zinc_args_file = os.path.join(target_workdir, 'zinc_args')
-    strict_deps = self.strict_deps_enabled(target)
+    strict_deps = target.defaulted_property(lambda x: x.strict_deps)
     return CompileContext(target,
                           analysis_file,
                           classes_dir,
@@ -866,8 +793,8 @@ class JvmCompile(NailgunTaskBase):
           safe_rmtree(ctx.classes_dir)
 
         tgt, = vts.targets
-        fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
-        zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
+        fatal_warnings = tgt.defaulted_property(lambda x: x.fatal_warnings)
+        zinc_file_manager = tgt.defaulted_property(lambda x: x.zinc_file_manager)
         self._compile_vts(vts,
                           ctx.target,
                           ctx.sources,
