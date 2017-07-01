@@ -15,6 +15,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.build_graph.target_scopes import Scopes
 
 
 class SyntheticTargetNotFound(Exception):
@@ -22,14 +23,14 @@ class SyntheticTargetNotFound(Exception):
 
 
 class DependencyContext(object):
-  def __init__(self, compiler_plugin_types, target_closure_kwargs):
+  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
+
+  def __init__(self, compiler_plugin_types):
     """
     :param compiler_plugins: A dict of compiler plugin target types and their
       additional classpath entries.
-    :param target_closure_kwargs: kwargs for the `target.closure` method.
     """
     self.compiler_plugin_types = compiler_plugin_types
-    self.target_closure_kwargs = target_closure_kwargs
 
   @classmethod
   def _get_synthetic_target(cls, target, thrift_dep):
@@ -86,14 +87,14 @@ class DependencyContext(object):
     """
     for declared in self._resolve_strict_dependencies(target):
       if isinstance(declared, self.compiler_plugin_types):
-        for r in declared.closure(bfs=True, **self.target_closure_kwargs):
+        for r in declared.closure(bfs=True, **self._target_closure_kwargs):
           yield r
       else:
         yield declared
 
   def all_dependencies(self, target):
     """All transitive dependencies of the context's target."""
-    for dep in target.closure(bfs=True, **self.target_closure_kwargs):
+    for dep in target.closure(bfs=True, **self._target_closure_kwargs):
       yield dep
 
 

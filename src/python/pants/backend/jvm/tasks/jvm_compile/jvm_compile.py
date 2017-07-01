@@ -13,14 +13,14 @@ from multiprocessing import cpu_count
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.subsystems.dependency_context import (DependencyContext,
-                                                             ResolvedJarAwareFingerprintStrategy)
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.dependency_context import (DependencyContext,
+                                                        ResolvedJarAwareFingerprintStrategy)
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -34,7 +34,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
@@ -302,9 +301,7 @@ class JvmCompile(NailgunTaskBase):
 
     self._size_estimator = self.size_estimator_by_name(self.get_options().size_estimator)
 
-    self._dep_context = DependencyContext(self.compiler_plugin_types(),
-                                          dict(include_scopes=Scopes.JVM_COMPILE_SCOPES,
-                                               respect_intransitive=True))
+    self._dep_context = DependencyContext(self.compiler_plugin_types())
 
   @property
   def _unused_deps_check_enabled(self):
