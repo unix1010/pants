@@ -119,11 +119,6 @@ class BaseZincCompile(JvmCompile):
     return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 6)]
 
   @classmethod
-  def compiler_plugin_types(cls):
-    """A tuple of target types which are compiler plugins."""
-    return (AnnotationProcessor, JavacPlugin, ScalacPlugin)
-
-  @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
     return ('-Dfile.encoding=UTF-8', '-Dzinc.analysis.cache.limit=1000',
             '-Djava.awt.headless=true', '-Xmx2g')

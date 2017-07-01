@@ -171,17 +171,6 @@ python_library(
 )
 
 python_library(
-  name = 'dependency_context',
-  sources = ['dependency_context.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:fingerprint_strategy',
-    'src/python/pants/build_graph',
-    'src/python/pants/java/jar',
-  ],
-)
-
-python_library(
   name = 'detect_duplicates',
   sources = ['detect_duplicates.py'],
   dependencies = [

@@ -7,8 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.build_graph.address import Address
@@ -16,21 +19,24 @@ from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
+from pants.subsystem.subsystem import Subsystem
 
 
 class SyntheticTargetNotFound(Exception):
   pass
 
 
-class DependencyContext(object):
-  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
+class DependencyContext(Subsystem):
+  """Implements calculating `exports` and exception (compiler-plugin) aware dependencies.
 
-  def __init__(self, compiler_plugin_types):
-    """
-    :param compiler_plugins: A dict of compiler plugin target types and their
-      additional classpath entries.
-    """
-    self.compiler_plugin_types = compiler_plugin_types
+  This is a subsystem because in future, the compiler plugin types should be injected
+  as dependencies rather than declared statically.
+  """
+
+  options_scope = 'jvm-dependency-context'
+
+  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
+  _compiler_plugin_types = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
 
   @classmethod
   def _get_synthetic_target(cls, target, thrift_dep):
@@ -86,7 +92,7 @@ class DependencyContext(object):
     of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
     """
     for declared in self._resolve_strict_dependencies(target):
-      if isinstance(declared, self.compiler_plugin_types):
+      if isinstance(declared, self._compiler_plugin_types):
         for r in declared.closure(bfs=True, **self._target_closure_kwargs):
           yield r
       else:

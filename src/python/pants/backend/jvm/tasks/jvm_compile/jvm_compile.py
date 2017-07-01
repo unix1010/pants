@@ -13,14 +13,14 @@ from multiprocessing import cpu_count
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.dependency_context import (DependencyContext,
+                                                             ResolvedJarAwareFingerprintStrategy)
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.dependency_context import (DependencyContext,
-                                                        ResolvedJarAwareFingerprintStrategy)
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -167,16 +167,14 @@ class JvmCompile(NailgunTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmCompile, cls).subsystem_dependencies() + (Java, JvmPlatform, ScalaPlatform)
+    return super(JvmCompile, cls).subsystem_dependencies() + (DependencyContext,
+                                                              Java,
+                                                              JvmPlatform,
+                                                              ScalaPlatform)
 
   @classmethod
   def name(cls):
     return cls._name
-
-  @classmethod
-  def compiler_plugin_types(cls):
-    """A tuple of target types which are compiler plugins."""
-    return ()
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -301,7 +299,7 @@ class JvmCompile(NailgunTaskBase):
 
     self._size_estimator = self.size_estimator_by_name(self.get_options().size_estimator)
 
-    self._dep_context = DependencyContext(self.compiler_plugin_types())
+    self._dep_context = DependencyContext.global_instance()
 
   @property
   def _unused_deps_check_enabled(self):
