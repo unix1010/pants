@@ -9,9 +9,10 @@ from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.base.build_environment import get_buildroot
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_property
 
 
 class Zinc(Subsystem, JvmToolMixin):
@@ -123,7 +124,6 @@ class Zinc(Subsystem, JvmToolMixin):
       )
 
   @classmethod
-  @memoized_method
   def _extra_compile_time_classpath_elements(cls, jvm_tool_mixin_instance, products):
     """Any additional global compiletime classpath entries.
 

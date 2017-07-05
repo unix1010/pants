@@ -54,7 +54,9 @@ python_library(
     ':nailgun_task',
     'src/python/pants/backend/jvm/subsystems:dependency_context',
     'src/python/pants/backend/jvm/subsystems:zinc',
+    'src/python/pants/goal:products',
     'src/python/pants/task',
+    'src/python/pants/util:memo',
   ],
 )
 

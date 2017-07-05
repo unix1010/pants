@@ -331,12 +331,13 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write(b'\n')
 
-    if Zinc.global_instance().runjava(classpath=self._zinc_tool_classpath('zinc'),
-                                      main=Zinc.ZINC_COMPILE_MAIN,
-                                      jvm_options=jvm_options,
-                                      args=zinc_args,
-                                      workunit_name=self.name(),
-                                      workunit_labels=[WorkUnitLabel.COMPILER]):
+    if self.runjava(classpath=self._zinc_tool_classpath('zinc'),
+                    main=Zinc.ZINC_COMPILE_MAIN,
+                    jvm_options=jvm_options,
+                    args=zinc_args,
+                    workunit_name=self.name(),
+                    workunit_labels=[WorkUnitLabel.COMPILER],
+                    dist=Zinc.global_instance().dist):
       raise TaskError('Zinc compile failed.')
 
   def _verify_zinc_classpath(self, classpath):

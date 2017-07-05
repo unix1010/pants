@@ -9,8 +9,8 @@ from collections import namedtuple
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import target_option
 from pants.java.distribution.distribution import DistributionLocator
+from pants.option.custom_types import target_option
 
 
 class JvmToolMixin(object):

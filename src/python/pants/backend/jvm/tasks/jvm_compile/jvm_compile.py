@@ -33,7 +33,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
                                 safe_walk)
@@ -579,7 +578,8 @@ class JvmCompile(NailgunTaskBase):
 
     if zinc_analysis is not None:
       for compile_context in compile_contexts:
-        zinc_analysis[compile_context.target] = compile_context.analysis_file
+        zinc_analysis[compile_context.target] = (compile_context.classes_dir,
+                                                 compile_context.analysis_file)
 
     if zinc_args is not None:
       for compile_context in compile_contexts:
