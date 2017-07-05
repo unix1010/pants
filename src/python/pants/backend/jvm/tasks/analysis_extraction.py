@@ -10,12 +10,15 @@ import os
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.java.jar.jar_dependency import JarDependency
 
 
 class AnalysisExtraction(NailgunTask):
   """A task that handles extracting product and dependency information from zinc analysis."""
 
   cache_target_dirs = True
+
+  _TOOL_NAME = 'zinc-extractor'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -30,6 +33,14 @@ class AnalysisExtraction(NailgunTask):
              help='Controls whether unused deps are checked, and whether they cause warnings or '
                   'errors. This option uses zinc\'s analysis to determine which deps are unused, '
                   'and can thus result in false negatives: thus it is disabled by default.')
+
+    cls.register_jvm_tool(register,
+                          cls._TOOL_NAME,
+                          classpath=[
+                            JarDependency(org='org.pantsbuild',
+                                          name='zinc-extractor_2.11',
+                                          rev='stuhood-zinc-1.0.0-X16-16')
+                          ])
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -59,6 +70,114 @@ class AnalysisExtraction(NailgunTask):
   def _unused_deps_check_enabled(self):
     return self.get_options().unused_deps != 'ignore'
 
+  def _summary_json_file(self, vt):
+    return os.path.join(vt.results_dir, 'summary.json')
+
+  def execute(self):
+    self._create_empty_products()
+
+    zinc_analysis = self.context.products.get_data('zinc_analysis')
+    classpath_product = self.context.products.get_data('runtime_classpath')
+    classes_by_source = self.context.products.get_data('classes_by_source')
+    product_deps_by_src = self.context.products.get_data('product_deps_by_src')
+
+    fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
+        classpath_product)
+
+    targets = zinc_analysis.keys()
+    with self.invalidated(targets,
+                          fingerprint_strategy=fingerprint_strategy,
+                          invalidate_dependents=True) as invalidation_check:
+      # Extract and parse products for any relevant targets.
+      for vt in invalidation_check.all_vts:
+        summary_json_file = self._summary_json_file(vt)
+        if not vt.valid:
+          self._extract_analysis(vt.target, zinc_analysis[vt.target], summary_json_file)
+        self._register_products(vt.target, summary_json_file, classes_by_source, product_deps_by_src)
+
+      # Once all products are parsed, if the unused deps check is enabled, run it for
+      # each target.
+      if self._unused_deps_check_enabled:
+        dep_analyzer = self._mk_dep_analyzer()
+        for vt in invalidation_check.invalid_vts:
+          self._check_unused_deps(dep_analyzer, vt.target)
+
+  def _extract_analysis(self, target, analysis_file, summary_json_file):
+    tgt_classpath = Zinc.global_instance().compile_classpath(self.context.products,
+                                                             'runtime_classpath',
+                                                             target)
+    args = [
+        '-summary-json', summary_json_file,
+        '-analysis-cache', analysis_file,
+        '-classpath', tgt_classpath,
+        '-analysis-map', thing,
+        '-rebase-map', Zinc.global_instance().rebase_map_args,
+      ]
+    result = self.runjava(classpath=self.tool_classpath(self._TOOL_NAME),
+                          main='org.pantsbuild.zinc.extractor.Main',
+                          args=self.get_command_args(files),
+                          workunit_name=self._TOOL_NAME)
+    if result != 0:
+      raise TaskError('Failed to parse analysis for {}'.format(target.address.spec),
+                      exit_code=result)
+
+  def _register_products(self, target, summary_json_file, classes_by_source, product_deps_by_src):
+    if not classes_by_source and not product_deps_by_src:
+      return None
+
+    product_json = self._parse_product_json(summary_json_file)
+
+    # Register a mapping between sources and classfiles (if requested).
+    if classes_by_source is not None:
+      self._compute_classes_by_source(target)
+      classes_dir = compile_context.classes_dir
+
+      for source in compile_context.sources:
+        classes = computed_classes_by_source.get(source, [])
+        classes_by_source[source].add_abs_paths(classes_dir, classes)
+
+    # Register classfile product dependencies (if requested).
+    if product_deps_by_src is not None:
+      product_deps_by_src[target] = \
+          self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
+
+  def _parse_product_json(self, product_json_file):
+    thing
+
+  def _compute_classes_by_source(self, target, results_dir):
+    """Compute a map of (context->(src->classes)) for the given target.
+
+    It's possible (although unfortunate) for multiple targets to own the same sources, hence
+    the top level division. Srcs are relative to buildroot. Classes are absolute paths.
+
+    Returning classes with 'None' as their src indicates that the compiler analysis indicated
+    that they were un-owned. This case is triggered when annotation processors generate
+    classes (or due to bugs in classfile tracking in zinc.)
+    """
+    buildroot = get_buildroot()
+    # Walk the context's jar to build a set of unclaimed classfiles.
+    unclaimed_classes = set()
+    with compile_context.open_jar(mode='r') as jar:
+      for name in jar.namelist():
+        if not name.endswith('/'):
+          unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
+
+    # Grab the analysis' view of which classfiles were generated.
+    classes_by_src = classes_by_src_by_context[compile_context]
+    if os.path.exists(compile_context.analysis_file):
+      # TODO: Need to support (optionally) writing out a JSON version of the products.
+      products = {}
+      #products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
+      #                                                          compile_context.classes_dir)
+      for src, classes in products.items():
+        relsrc = os.path.relpath(src, buildroot)
+        classes_by_src[relsrc] = classes
+        unclaimed_classes.difference_update(classes)
+
+    # Any remaining classfiles were unclaimed by sources/analysis.
+    classes_by_src[None] = list(unclaimed_classes)
+    return classes_by_src
+
   def _check_unused_deps(self, dep_analyzer, target):
     """Uses `product_deps_by_src` to check unused deps and warn or error."""
     with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
@@ -87,85 +206,3 @@ class AnalysisExtraction(NailgunTask):
         raise TaskError(unused_msg)
       else:
         self.context.log.warn('Target {} had {}\n'.format(target.address.spec, unused_msg))
-
-  def execute(self):
-    self._create_empty_products()
-
-    zinc_analysis = self.context.products.get_data('zinc_analysis')
-    classpath_product = self.context.products.get_data('runtime_classpath')
-    fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
-        classpath_product)
-
-    targets = zinc_analysis.keys()
-    with self.invalidated(targets,
-                          fingerprint_strategy=fingerprint_strategy,
-                          invalidate_dependents=True) as invalidation_check:
-      # Parse products for any relevant targets.
-      for vt in invalidation_check.all_vts:
-        if not vt.valid:
-          pass
-
-      # Once all products are parsed, if the unused deps check is enabled, run it for
-      # each target.
-      if self._unused_deps_check_enabled:
-        dep_analyzer = self._mk_dep_analyzer()
-        for vt in invalidation_check.invalid_vts:
-          self._check_unused_deps(dep_analyzer, vt.target)
-
-  def _register_vts(self, compile_contexts):
-    classes_by_source = self.context.products.get_data('classes_by_source')
-    product_deps_by_src = self.context.products.get_data('product_deps_by_src')
-    zinc_args = self.context.products.get_data('zinc_args')
-
-    # Register a mapping between sources and classfiles (if requested).
-    if classes_by_source is not None:
-      ccbsbc = self.compute_classes_by_source(compile_contexts).items()
-      for compile_context, computed_classes_by_source in ccbsbc:
-        classes_dir = compile_context.classes_dir
-
-        for source in compile_context.sources:
-          classes = computed_classes_by_source.get(source, [])
-          classes_by_source[source].add_abs_paths(classes_dir, classes)
-
-    # Register classfile product dependencies (if requested).
-    if product_deps_by_src is not None:
-      for compile_context in compile_contexts:
-        product_deps_by_src[compile_context.target] = \
-            self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
-
-  def _compute_classes_by_source(self, compile_contexts):
-    """Compute a map of (context->(src->classes)) for the given compile_contexts.
-
-    It's possible (although unfortunate) for multiple targets to own the same sources, hence
-    the top level division. Srcs are relative to buildroot. Classes are absolute paths.
-
-    Returning classes with 'None' as their src indicates that the compiler analysis indicated
-    that they were un-owned. This case is triggered when annotation processors generate
-    classes (or due to bugs in classfile tracking in zinc/jmake.)
-    """
-    buildroot = get_buildroot()
-    # Build a mapping of srcs to classes for each context.
-    classes_by_src_by_context = defaultdict(dict)
-    for compile_context in compile_contexts:
-      # Walk the context's jar to build a set of unclaimed classfiles.
-      unclaimed_classes = set()
-      with compile_context.open_jar(mode='r') as jar:
-        for name in jar.namelist():
-          if not name.endswith('/'):
-            unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
-
-      # Grab the analysis' view of which classfiles were generated.
-      classes_by_src = classes_by_src_by_context[compile_context]
-      if os.path.exists(compile_context.analysis_file):
-        # TODO: Need to support (optionally) writing out a JSON version of the products.
-        products = {}
-        #products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
-        #                                                          compile_context.classes_dir)
-        for src, classes in products.items():
-          relsrc = os.path.relpath(src, buildroot)
-          classes_by_src[relsrc] = classes
-          unclaimed_classes.difference_update(classes)
-
-      # Any remaining classfiles were unclaimed by sources/analysis.
-      classes_by_src[None] = list(unclaimed_classes)
-    return classes_by_src_by_context

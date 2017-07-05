@@ -514,7 +514,6 @@ python_library(
   dependencies = [
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/base:exceptions',
-    'src/python/pants/java/distribution',
     'src/python/pants/task',
   ],
 )

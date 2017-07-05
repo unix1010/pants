@@ -17,6 +17,7 @@ python_library(
   sources = ['jvm_tool_mixin.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
+    'src/python/pants/java/distribution',
     'src/python/pants/option',
   ],
 )

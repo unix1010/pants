@@ -10,6 +10,7 @@ from textwrap import dedent
 
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import target_option
+from pants.java.distribution.distribution import DistributionLocator
 
 
 class JvmToolMixin(object):
@@ -48,6 +49,10 @@ class JvmToolMixin(object):
       return options.for_scope(self.scope).is_default(self.key.replace('-', '_'))
 
   _jvm_tools = []  # List of JvmTool objects.
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmToolMixin, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
@@ -155,6 +160,25 @@ class JvmToolMixin(object):
   def reset_registered_tools():
     """Needed only for test isolation."""
     JvmToolMixin._jvm_tools = []
+
+  def __init__(self, *args, **kwargs):
+    """
+    :API: public
+    """
+    super(JvmToolMixin, self).__init__(*args, **kwargs)
+    self.set_distribution()    # Use default until told otherwise.
+    # TODO: Choose default distribution based on options.
+
+  def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
+    try:
+      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
+                                              maximum_version=maximum_version, jdk=jdk)
+    except DistributionLocator.Error as e:
+      raise TaskError(e)
+
+  @property
+  def dist(self):
+    return self._dist
 
   def tool_jar_from_products(self, products, key, scope):
     """Get the jar for the tool previously registered under key in the given scope.

@@ -691,10 +691,10 @@ class JvmCompile(NailgunTaskBase):
       if not hit_cache:
         # Compute the compile classpath for this target.
         cp_entries = [ctx.classes_dir]
-        cp_entries.extend(Zinc.global_instance().compile_classpath(self._zinc_tools,
-                                                                   self.context.products,
-                                                                   classpath_product_key,
-                                                                   ctx.target))
+        cp_entries.extend(Zinc.compile_classpath_for(self._zinc_tools,
+                                                     self.context.products,
+                                                     classpath_product_key,
+                                                     ctx.target))
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         if not should_compile_incrementally(vts, ctx):

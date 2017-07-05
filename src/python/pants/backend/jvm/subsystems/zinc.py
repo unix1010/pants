@@ -32,13 +32,13 @@ class Zinc(Subsystem, JvmToolMixin):
     return super(Zinc, cls).subsystem_dependencies() + (DependencyContext,)
 
   @staticmethod
-  def register_options_for(jvm_tool_mixin_cls, register, **kwargs):
+  def register_options_for(jvm_tool_mixin_instance, register, **kwargs):
     """Register options for the zinc tool in the context of the given JvmToolMixin.
     
     TODO: Move into the classmethod after zinc registration has been removed
     from `zinc_compile` in `1.6.0.dev0`.
     """
-    cls = jvm_tool_mixin_cls
+    cls = jvm_tool_mixin_instance
 
     register('--javac-plugins', advanced=True, type=list, fingerprint=True,
              help='Use these javac plugins.',
@@ -105,33 +105,58 @@ class Zinc(Subsystem, JvmToolMixin):
                           custom_rules=shader_rules,
                           **kwargs)
 
+  def __init__(self, *args, **kwargs):
+    super(Zinc, self).__init__(*args, **kwargs)
+    self.set_distribution(jdk=True)
+
+  @memoized_property
+  def rebase_map_args(self):
+    """We rebase known stable paths in zinc analysis to make it portable across machines."""
+    rebases = {
+        self.dist.real_home: '/dev/null/java_home/',
+        get_buildroot(): '/dev/null/buildroot/',
+        self.get_options().pants_workdir: '/dev/null/workdir/',
+      }
+    return (
+        '-rebase-map',
+        ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
+      )
+
+  @classmethod
   @memoized_method
-  def _extra_compile_time_classpath_elements(self, jvm_tool_mixin_cls, products):
+  def _extra_compile_time_classpath_elements(cls, jvm_tool_mixin_instance, products):
     """Any additional global compiletime classpath entries.
 
-    TODO: Switch to memoized_property after 1.6.0.dev0.
+    TODO: Switch to instance memoized_property after 1.6.0.dev0.
     """
-    javac_classpath = jvm_tool_mixin_cls.tool_classpath_from_products(products,
-                                                                      'javac-plugin-dep',
-                                                                      scope=self.options_scope)
-    scalac_classpath = jvm_tool_mixin_cls.tool_classpath_from_products(products,
-                                                                       'scalac-plugin-dep',
-                                                                       scope=self.options_scope)
-    classpaths = javac_classpath + scalac_classpath
-    return [(conf, jar) for conf in self.DEFAULT_CONFS for jar in classpaths]
+    def cp(toolname):
+      scope = jvm_tool_mixin_instance.options_scope
+      return jvm_tool_mixin_instance.tool_classpath_from_products(products,
+                                                                  toolname,
+                                                                  scope=scope)
+    classpaths = cp('javac-plugin-dep') + cp('scalac-plugin-dep')
+    return [(conf, jar) for conf in cls.DEFAULT_CONFS for jar in classpaths]
 
-  def compile_classpath(self, jvm_tool_mixin_cls, products, classpath_product_key, target):
+  def compile_classpath(self, products, classpath_product_key, target):
     """Compute the compile classpath for the given target."""
+    return Zinc.compile_classpath_for(self, products, classpath_product_key, target)
+
+  @classmethod
+  def compile_classpath_for(cls, jvm_tool_mixin_instance, products, classpath_product_key, target):
+    """Compute the compile classpath for the given target.
+
+    TODO: Merge with `compile_classpath` after 1.6.0.dev0.
+    """
     classpath_product = products.get_data(classpath_product_key)
 
     if target.defaulted_property(lambda x: x.strict_deps):
       dependencies = DependencyContext.global_instance().strict_dependencies(target)
     else:
       dependencies = DependencyContext.global_instance().all_dependencies(target)
-    extra_compile_time_classpath_elements = self._extra_compile_time_classpath_elements(jvm_tool_mixin_cls,
+    extra_compile_time_classpath_elements = cls._extra_compile_time_classpath_elements(jvm_tool_mixin_instance,
                                                                                         products)
 
     return ClasspathUtil.compute_classpath(dependencies,
                                            classpath_product,
                                            extra_compile_time_classpath_elements,
-                                           self.DEFAULT_CONFS)
+                                           cls.DEFAULT_CONFS)

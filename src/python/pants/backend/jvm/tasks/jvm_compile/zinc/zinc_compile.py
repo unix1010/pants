@@ -198,8 +198,6 @@ class BaseZincCompile(JvmCompile):
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
-    self.set_distribution(jdk=True)
-
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
@@ -212,19 +210,6 @@ class BaseZincCompile(JvmCompile):
 
   def select_source(self, source_file_path):
     raise NotImplementedError()
-
-  @memoized_property
-  def _rebase_map_args(self):
-    """We rebase known stable paths in the analysis to make it portable across machines."""
-    rebases = {
-        self.dist.real_home: '/dev/null/java_home/',
-        get_buildroot(): '/dev/null/buildroot/',
-        self.get_options().pants_workdir: '/dev/null/workdir/',
-      }
-    return (
-        '-rebase-map',
-        ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
-      )
 
   def javac_classpath(self):
     # Note that if this classpath is empty then Zinc will automatically use the javac from
@@ -307,7 +292,7 @@ class BaseZincCompile(JvmCompile):
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
 
-    zinc_args.extend(self._rebase_map_args)
+    zinc_args.extend(Zinc.global_instance().rebase_map_args)
 
     zinc_args.extend(args)
     zinc_args.extend(self._get_zinc_arguments(settings))
@@ -346,23 +331,25 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write(b'\n')
 
-    if self.runjava(classpath=self._zinc_tool_classpath('zinc'),
-                    main=Zinc.ZINC_COMPILE_MAIN,
-                    jvm_options=jvm_options,
-                    args=zinc_args,
-                    workunit_name=self.name(),
-                    workunit_labels=[WorkUnitLabel.COMPILER]):
+    if Zinc.global_instance().runjava(classpath=self._zinc_tool_classpath('zinc'),
+                                      main=Zinc.ZINC_COMPILE_MAIN,
+                                      jvm_options=jvm_options,
+                                      args=zinc_args,
+                                      workunit_name=self.name(),
+                                      workunit_labels=[WorkUnitLabel.COMPILER]):
       raise TaskError('Zinc compile failed.')
 
   def _verify_zinc_classpath(self, classpath):
     def is_outside(path, putative_parent):
       return os.path.relpath(path, putative_parent).startswith(os.pardir)
 
+    dist = Zinc.global_instance().dist
     for path in classpath:
       if not os.path.isabs(path):
         raise TaskError('Classpath entries provided to zinc should be absolute. '
                         '{} is not.'.format(path))
-      if is_outside(path, self.get_options().pants_workdir) and is_outside(path, self.dist.home):
+
+      if is_outside(path, self.get_options().pants_workdir) and is_outside(path, dist.home):
         raise TaskError('Classpath entries provided to zinc should be in working directory or '
                         'part of the JDK. {} is not.'.format(path))
       if path != os.path.normpath(path):
