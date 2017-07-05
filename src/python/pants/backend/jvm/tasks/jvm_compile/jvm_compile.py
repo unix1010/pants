@@ -20,7 +20,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -63,7 +63,9 @@ class JvmCompile(NailgunTaskBase):
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these extra args to the compiler.')
 
-    register('--confs', advanced=True, type=list, default=['default'],
+    register('--confs', advanced=True, type=list, default=Zinc.DEFAULT_CONFS,
+             removal_version='1.6.0.dev0',
+             removal_hint='Compiling for confs other than `default` is no longer supported.',
              help='Compile for these Ivy confs.')
 
     register('--clear-invalid-analysis', advanced=True, type=bool,
@@ -170,7 +172,8 @@ class JvmCompile(NailgunTaskBase):
     return super(JvmCompile, cls).subsystem_dependencies() + (DependencyContext,
                                                               Java,
                                                               JvmPlatform,
-                                                              ScalaPlatform)
+                                                              ScalaPlatform,
+                                                              Zinc)
 
   @classmethod
   def name(cls):
@@ -211,6 +214,40 @@ class JvmCompile(NailgunTaskBase):
   def cache_target_dirs(self):
     return True
 
+  @memoized_property
+  def _zinc_tools(self):
+    """Get the instance of the JvmToolMixin to use for zinc.
+
+    TODO: Remove and use Zinc.global_instance() directly once the old tool location is removed
+    in `1.6.0.dev0`.
+    """
+    # If any tools were explicitly specified on self, use them... else, use the Zinc subsystem.
+    # TODO: Bit fragile, but temporary.
+    explicit_keys = set(self.get_options().get_explicit_keys())
+    explicit_on_self = explicit_keys & set([
+        'compiler-bridge',
+        'compiler-interface',
+        'javac-plugin-args',
+        'javac-plugin-dep',
+        'javac-plugins',
+        'scalac-plugin-args',
+        'scalac-plugin-dep',
+        'scalac-plugin-jars',
+        'scalac-plugins',
+        'zinc',
+      ])
+    return self if explicit_on_self else Zinc.global_instance()
+
+  def _zinc_tool_classpath(self, toolname):
+    return self._zinc_tools.tool_classpath_from_products(self.context.products,
+                                                         toolname,
+                                                         scope=self.options_scope)
+
+  def _zinc_tool_jar(self, toolname):
+    return self._zinc_tools.tool_jar_from_products(self.context.products,
+                                                   toolname,
+                                                   scope=self.options_scope)
+
   def select(self, target):
     raise NotImplementedError()
 
@@ -244,16 +281,6 @@ class JvmCompile(NailgunTaskBase):
 
   # Subclasses may override.
   # ------------------------
-  def extra_compile_time_classpath_elements(self):
-    """Extra classpath elements common to all compiler invocations.
-
-    E.g., jars for compiler plugins.
-
-    These are added at the end of the classpath, after any dependencies, so that if they
-    overlap with any explicit dependencies, the compiler sees those first.  This makes
-    missing dependency accounting much simpler.
-    """
-    return []
 
   def write_extra_resources(self, compile_context):
     """Writes any extra, out-of-band resources for a target to its classes directory.
@@ -325,15 +352,13 @@ class JvmCompile(NailgunTaskBase):
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
     zinc_args_file = os.path.join(target_workdir, 'zinc_args')
-    strict_deps = target.defaulted_property(lambda x: x.strict_deps)
     return CompileContext(target,
                           analysis_file,
                           classes_dir,
                           jar_file,
                           log_file,
                           zinc_args_file,
-                          self._compute_sources_for_target(target),
-                          strict_deps)
+                          self._compute_sources_for_target(target))
 
   def execute(self):
     # In case we have no relevant targets and return early create the requested product maps.
@@ -377,7 +402,6 @@ class JvmCompile(NailgunTaskBase):
         self.do_compile(
           invalidation_check,
           compile_contexts,
-          self.extra_compile_time_classpath_elements(),
         )
 
       if not self.get_options().use_classpath_jars:
@@ -398,10 +422,7 @@ class JvmCompile(NailgunTaskBase):
 
     return classpath_product
 
-  def do_compile(self,
-                 invalidation_check,
-                 compile_contexts,
-                 extra_compile_time_classpath_elements):
+  def do_compile(self, invalidation_check, compile_contexts):
     """Executes compilations for the invalid targets contained in a single chunk."""
 
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
@@ -423,16 +444,10 @@ class JvmCompile(NailgunTaskBase):
       cc = compile_contexts[target]
       safe_mkdir(cc.classes_dir)
 
-    # Get the classpath generated by upstream JVM tasks and our own prepare_compile().
-    classpath_products = self.context.products.get_data('runtime_classpath')
-
-    extra_compile_time_classpath = self._compute_extra_classpath(
-        extra_compile_time_classpath_elements)
-
-    # Now create compile jobs for each invalid target one by one.
-    jobs = self._create_compile_jobs(classpath_products,
+    # Now create compile jobs for each invalid target one by one, using the classpath
+    # generated by upstream JVM tasks and our own prepare_compile().
+    jobs = self._create_compile_jobs('runtime_classpath',
                                      compile_contexts,
-                                     extra_compile_time_classpath,
                                      invalid_targets,
                                      invalidation_check.invalid_vts)
 
@@ -718,7 +733,7 @@ class JvmCompile(NailgunTaskBase):
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
-  def _create_compile_jobs(self, classpath_products, compile_contexts, extra_compile_time_classpath,
+  def _create_compile_jobs(self, classpath_product_key, compile_contexts,
                            invalid_targets, invalid_vts):
     class Counter(object):
       def __init__(self, size, initial=0):
@@ -775,10 +790,10 @@ class JvmCompile(NailgunTaskBase):
       if not hit_cache:
         # Compute the compile classpath for this target.
         cp_entries = [ctx.classes_dir]
-        cp_entries.extend(ClasspathUtil.compute_classpath(ctx.dependencies(self._dep_context),
-                                                          classpath_products,
-                                                          extra_compile_time_classpath,
-                                                          self._confs))
+        cp_entries.extend(Zinc.global_instance().compile_classpath(self._zinc_tools,
+                                                                   self.context.products,
+                                                                   classpath_product_key,
+                                                                   ctx.target))
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         if not should_compile_incrementally(vts, ctx):
@@ -886,18 +901,6 @@ class JvmCompile(NailgunTaskBase):
     if hasattr(target, 'java_sources') and target.java_sources:
       sources.extend(resolve_target_sources(target.java_sources))
     return sources
-
-  def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
-    """Compute any extra compile-time-only classpath elements.
-
-    TODO(benjy): Model compile-time vs. runtime classpaths more explicitly.
-    """
-    def extra_compile_classpath_iter():
-      for conf in self._confs:
-        for jar in extra_compile_time_classpath_elements:
-          yield (conf, jar)
-
-    return list(extra_compile_classpath_iter())
 
   @memoized_method
   def _plugin_targets(self, compiler):

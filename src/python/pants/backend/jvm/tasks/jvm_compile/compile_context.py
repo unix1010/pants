@@ -23,7 +23,7 @@ class CompileContext(object):
   """
 
   def __init__(self, target, analysis_file, classes_dir, jar_file,
-               log_file, zinc_args_file, sources, strict_deps):
+               log_file, zinc_args_file, sources):
     self.target = target
     self.analysis_file = analysis_file
     self.classes_dir = classes_dir
@@ -31,19 +31,11 @@ class CompileContext(object):
     self.log_file = log_file
     self.zinc_args_file = zinc_args_file
     self.sources = sources
-    self.strict_deps = strict_deps
 
   @contextmanager
   def open_jar(self, mode):
     with open_zip(self.jar_file, mode=mode, compression=zipfile.ZIP_STORED) as jar:
       yield jar
-
-  def dependencies(self, dep_context):
-    """Yields the compile time dependencies of this target, in the given DependencyContext."""
-    if self.strict_deps:
-      return dep_context.strict_dependencies(self.target)
-    else:
-      return dep_context.all_dependencies(self.target)
 
   @property
   def _id(self):

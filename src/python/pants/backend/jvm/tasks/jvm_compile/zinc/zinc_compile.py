@@ -47,7 +47,10 @@ logger = logging.getLogger(__name__)
 
 
 class BaseZincCompile(JvmCompile):
-  """An abstract base class for zinc compilation tasks."""
+  """An abstract base class for zinc compilation tasks.
+
+  TODO: Merge with JvmCompile.
+  """
 
   _supports_concurrent_execution = True
 
@@ -175,10 +178,6 @@ class BaseZincCompile(JvmCompile):
                               removal_hint='Zinc tools should be registered via the `zinc` scope.')
 
   @classmethod
-  def subsystem_dependencies(cls):
-    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc,)
-
-  @classmethod
   def prepare(cls, options, round_manager):
     super(BaseZincCompile, cls).prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
@@ -196,28 +195,6 @@ class BaseZincCompile(JvmCompile):
   def cache_incremental(self):
     """Optionally write the results of incremental compiles to the cache."""
     return self.get_options().incremental_caching
-
-  @memoized_property
-  def _zinc_tools(self):
-    """Get the instance of the JvmToolMixin to use for zinc.
-
-    TODO: Remove and use Zinc.global_instance() directly once the old tool location is removed
-    in `1.6.0.dev0`.
-    """
-    # If any tools were explicitly specified on self, use them... else, use the Zinc subsystem.
-    explicit_keys = set(self.get_options().get_explicit_keys())
-    explicit_on_self = explicit_keys & set(['zinc', 'compiler-bridge', 'compiler-interface'])
-    return self if explicit_on_self else Zinc.global_instance()
-
-  def _zinc_tool_classpath(self, toolname):
-    return self._zinc_tools.tool_classpath_from_products(self.context.products,
-                                                         toolname,
-                                                         scope=self.options_scope)
-
-  def _zinc_tool_jar(self, toolname):
-    return self._zinc_tools.tool_jar_from_products(self.context.products,
-                                                   toolname,
-                                                   scope=self.options_scope)
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
@@ -491,34 +468,8 @@ class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
 
   @classmethod
-  def register_options(cls, register):
-    super(ZincCompile, cls).register_options(register)
-    register('--javac-plugins', advanced=True, type=list, fingerprint=True,
-             help='Use these javac plugins.')
-    register('--javac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-             help='Map from javac plugin name to list of arguments for that plugin.')
-    cls.register_jvm_tool(register, 'javac-plugin-dep', classpath=[],
-                          help='Search for javac plugins here, as well as in any '
-                               'explicit dependencies.')
-
-    register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
-             help='Use these scalac plugins.')
-    register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-             help='Map from scalac plugin name to list of arguments for that plugin.')
-    cls.register_jvm_tool(register, 'scalac-plugin-jars', classpath=[],
-                          removal_version='1.5.0.dev0',
-                          removal_hint='Use --compile-zinc-scalac-plugin-dep instead.')
-    cls.register_jvm_tool(register, 'scalac-plugin-dep', classpath=[],
-                          help='Search for scalac plugins here, as well as in any '
-                               'explicit dependencies.')
-
-  @classmethod
   def product_types(cls):
     return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src', 'zinc_args']
-
-  def extra_compile_time_classpath_elements(self):
-    """Classpath entries containing plugins."""
-    return self.tool_classpath('javac-plugin-dep') + self.tool_classpath('scalac-plugin-dep')
 
   def select(self, target):
     # Require that targets are marked for JVM compilation, to differentiate from
