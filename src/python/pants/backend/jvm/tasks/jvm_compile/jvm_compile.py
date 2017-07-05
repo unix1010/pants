@@ -13,14 +13,13 @@ from multiprocessing import cpu_count
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.subsystems.dependency_context import (DependencyContext,
-                                                             ResolvedJarAwareFingerprintStrategy)
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
-from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -124,6 +123,8 @@ class JvmCompile(NailgunTaskBase):
 
     register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='ignore',
              fingerprint=True,
+             removal_version='1.6.0.dev0',
+             removal_hint='Option has moved to the compile.analysis scope.',
              help='Controls whether unused deps are checked, and whether they cause warnings or '
                   'errors. This option uses zinc\'s analysis to determine which deps are unused, '
                   'and can thus result in false negatives: thus it is disabled by default.')
@@ -222,7 +223,7 @@ class JvmCompile(NailgunTaskBase):
     in `1.6.0.dev0`.
     """
     # If any tools were explicitly specified on self, use them... else, use the Zinc subsystem.
-    # TODO: Bit fragile, but temporary.
+    # TODO: Fragile, but temporary.
     explicit_keys = set(self.get_options().get_explicit_keys())
     explicit_on_self = explicit_keys & set([
         'compiler-bridge',
@@ -326,25 +327,10 @@ class JvmCompile(NailgunTaskBase):
 
     self._size_estimator = self.size_estimator_by_name(self.get_options().size_estimator)
 
-    self._dep_context = DependencyContext.global_instance()
-
-  @property
-  def _unused_deps_check_enabled(self):
-    return self.get_options().unused_deps != 'ignore'
-
-  @memoized_property
-  def _dep_analyzer(self):
-    return JvmDependencyAnalyzer(get_buildroot(),
-                                 self.context.products.get_data('runtime_classpath'),
-                                 self.context.products.get_data('product_deps_by_src'))
-
   @memoized_property
   def _missing_deps_finder(self):
     return MissingDependencyFinder(self._dep_analyzer, CompileErrorExtractor(
       self.get_options().class_not_found_error_patterns))
-
-  def _fingerprint_strategy(self, classpath_products):
-    return ResolvedJarAwareFingerprintStrategy(classpath_products, self._dep_context)
 
   def _compile_context(self, target, target_workdir):
     analysis_file = os.path.join(target_workdir, 'z.analysis')
@@ -377,7 +363,8 @@ class JvmCompile(NailgunTaskBase):
         return context.jar_file
       return context.classes_dir
 
-    fingerprint_strategy = self._fingerprint_strategy(classpath_product)
+    fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
+        classpath_product)
     # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
     # we begin writing artifacts out to the cache immediately instead of waiting for
     # all targets to finish.
@@ -580,111 +567,25 @@ class JvmCompile(NailgunTaskBase):
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process)
 
   def _create_empty_products(self):
-    if self.context.products.is_required_data('classes_by_source'):
-      make_products = lambda: defaultdict(MultipleRootedProducts)
-      self.context.products.safe_create_data('classes_by_source', make_products)
-
-    if self.context.products.is_required_data('product_deps_by_src') \
-        or self._unused_deps_check_enabled:
-      self.context.products.safe_create_data('product_deps_by_src', dict)
+    if self.context.products.is_required_data('zinc_analysis'):
+      self.context.products.safe_create_data('zinc_analysis', dict)
 
     if self.context.products.is_required_data('zinc_args'):
       self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
-  def compute_classes_by_source(self, compile_contexts):
-    """Compute a map of (context->(src->classes)) for the given compile_contexts.
-
-    It's possible (although unfortunate) for multiple targets to own the same sources, hence
-    the top level division. Srcs are relative to buildroot. Classes are absolute paths.
-
-    Returning classes with 'None' as their src indicates that the compiler analysis indicated
-    that they were un-owned. This case is triggered when annotation processors generate
-    classes (or due to bugs in classfile tracking in zinc/jmake.)
-    """
-    buildroot = get_buildroot()
-    # Build a mapping of srcs to classes for each context.
-    classes_by_src_by_context = defaultdict(dict)
-    for compile_context in compile_contexts:
-      # Walk the context's jar to build a set of unclaimed classfiles.
-      unclaimed_classes = set()
-      with compile_context.open_jar(mode='r') as jar:
-        for name in jar.namelist():
-          if not name.endswith('/'):
-            unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
-
-      # Grab the analysis' view of which classfiles were generated.
-      classes_by_src = classes_by_src_by_context[compile_context]
-      if os.path.exists(compile_context.analysis_file):
-        # TODO: Need to support (optionally) writing out a JSON version of the products.
-        products = {}
-        #products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
-        #                                                          compile_context.classes_dir)
-        for src, classes in products.items():
-          relsrc = os.path.relpath(src, buildroot)
-          classes_by_src[relsrc] = classes
-          unclaimed_classes.difference_update(classes)
-
-      # Any remaining classfiles were unclaimed by sources/analysis.
-      classes_by_src[None] = list(unclaimed_classes)
-    return classes_by_src_by_context
-
   def _register_vts(self, compile_contexts):
-    classes_by_source = self.context.products.get_data('classes_by_source')
-    product_deps_by_src = self.context.products.get_data('product_deps_by_src')
+    zinc_analysis = self.context.products.get_data('zinc_analysis')
     zinc_args = self.context.products.get_data('zinc_args')
 
-    # Register a mapping between sources and classfiles (if requested).
-    if classes_by_source is not None:
-      ccbsbc = self.compute_classes_by_source(compile_contexts).items()
-      for compile_context, computed_classes_by_source in ccbsbc:
-        classes_dir = compile_context.classes_dir
-
-        for source in compile_context.sources:
-          classes = computed_classes_by_source.get(source, [])
-          classes_by_source[source].add_abs_paths(classes_dir, classes)
-
-    # Register classfile product dependencies (if requested).
-    if product_deps_by_src is not None:
+    if zinc_analysis is not None:
       for compile_context in compile_contexts:
-        product_deps_by_src[compile_context.target] = \
-            self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
+        zinc_analysis[compile_context.target] = compile_context.analysis_file
 
-    # Register the zinc args used to compile the target (if requested).
     if zinc_args is not None:
       for compile_context in compile_contexts:
         with open(compile_context.zinc_args_file, 'r') as fp:
           args = fp.read().split()
         zinc_args[compile_context.target] = args
-
-  def _check_unused_deps(self, compile_context):
-    """Uses `product_deps_by_src` to check unused deps and warn or error."""
-    with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
-      # Compute replacement deps.
-      replacement_deps = self._dep_analyzer.compute_unused_deps(compile_context.target)
-
-      if not replacement_deps:
-        return
-
-      # Warn or error for unused.
-      def joined_dep_msg(deps):
-        return '\n  '.join('\'{}\','.format(dep.address.spec) for dep in sorted(deps))
-      flat_replacements = set(r for replacements in replacement_deps.values() for r in replacements)
-      replacements_msg = ''
-      if flat_replacements:
-        replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))
-      unused_msg = (
-          'unused dependencies:\n  {}\n{}'
-          '(If you\'re seeing this message in error, you might need to '
-          'change the `scope` of the dependencies.)'.format(
-            joined_dep_msg(replacement_deps.keys()),
-            replacements_msg,
-          )
-        )
-      if self.get_options().unused_deps == 'fatal':
-        raise TaskError(unused_msg)
-      else:
-        self.context.log.warn('Target {} had {}\n'.format(
-          compile_context.target.address.spec, unused_msg))
 
   def _find_missing_deps(self, compile_failure_log, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
@@ -828,10 +729,6 @@ class JvmCompile(NailgunTaskBase):
 
       # Update the products with the latest classes.
       self._register_vts([ctx])
-
-      # Once products are registered, check for unused dependencies (if enabled).
-      if not hit_cache and self._unused_deps_check_enabled:
-        self._check_unused_deps(ctx)
 
     jobs = []
     invalid_target_set = set(invalid_targets)

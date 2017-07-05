@@ -30,6 +30,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.backend.jvm.tasks.analysis_extraction import AnalysisExtraction
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -154,7 +155,9 @@ def register_goals():
   task(name='provide-tools-jar', action=ProvideToolsJar).install('bootstrap')
 
   # Compile
+  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
   task(name='zinc', action=ZincCompile).install('compile')
+  task(name='analysis', action=AnalysisExtraction).install('compile')
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
@@ -167,7 +170,6 @@ def register_goals():
   task(name='services', action=PrepareServices).install('resources')
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install()
-  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
 

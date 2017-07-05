@@ -103,6 +103,9 @@ class DependencyContext(Subsystem):
     for dep in target.closure(bfs=True, **self._target_closure_kwargs):
       yield dep
 
+  def create_fingerprint_strategy(self, classpath_products):
+    return ResolvedJarAwareFingerprintStrategy(classpath_products, self)
+
 
 class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
