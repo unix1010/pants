@@ -46,7 +46,7 @@ class AnalysisExtraction(NailgunTask):
                           classpath=[
                             JarDependency(org='org.pantsbuild',
                                           name='zinc-extractor_2.11',
-                                          rev='stuhood-zinc-1.0.0-X16-16')
+                                          rev='stuhood-zinc-1.0.0-X16-17')
                           ])
 
   @classmethod
@@ -135,12 +135,11 @@ class AnalysisExtraction(NailgunTask):
                                                                 'runtime_classpath',
                                                                 target)
     analysis_by_cp_entry = self._analysis_by_runtime_entry
-    print('>>> {}'.format(analysis_by_cp_entry))
     upstream_analysis = list(self._upstream_analysis(target_classpath, analysis_by_cp_entry))
     args = [
         '-summary-json', summary_json_file,
         '-analysis-cache', analysis_file,
-        '-classpath', ','.join(target_classpath),
+        '-classpath', ':'.join(target_classpath),
         '-analysis-map', ','.join('{}:{}'.format(k, v) for k, v in upstream_analysis),
       ]
     args.extend(Zinc.global_instance().rebase_map_args)

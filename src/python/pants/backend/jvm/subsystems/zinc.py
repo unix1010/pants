@@ -20,7 +20,7 @@ class Zinc(Subsystem, JvmToolMixin):
 
   options_scope = 'zinc'
 
-  ZINC_COMPILE_MAIN = 'org.pantsbuild.zinc.Main'
+  ZINC_COMPILE_MAIN = 'org.pantsbuild.zinc.compiler.Main'
   DEFAULT_CONFS = ['default']
 
   @classmethod
@@ -82,7 +82,7 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.11', 'stuhood-zinc-1.0.0-X16-15'),
+                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'stuhood-zinc-1.0.0-X16-17'),
                           ],
                           **kwargs)
 
