@@ -137,7 +137,7 @@ class JvmDependencyCheck(Task):
       def filter_whitelisted(missing_deps):
         # Removing any targets that exist in the whitelist from the list of dependency issues.
         return [(tgt_pair, evidence) for (tgt_pair, evidence) in missing_deps
-                            if tgt_pair[0].address.reference() not in self._target_whitelist]
+                            if tgt_pair[0].address.spec not in self._target_whitelist]
 
       missing_tgt_deps = filter_whitelisted(missing_tgt_deps)
 
@@ -145,14 +145,14 @@ class JvmDependencyCheck(Task):
         log_fn = (self.context.log.error if self._check_missing_deps == 'fatal'
                   else self.context.log.warn)
         for (tgt_pair, evidence) in missing_tgt_deps:
-          evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
+          evidence_str = '\n'.join(['  {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
           log_fn('Missing BUILD dependency {} -> {} because:\n{}'
-                 .format(tgt_pair[0].address.reference(), tgt_pair[1].address.reference(),
+                 .format(tgt_pair[0].address.spec, tgt_pair[1].address.spec,
                          evidence_str))
         for (src_tgt, dep) in missing_file_deps:
           log_fn('Missing BUILD dependency {} -> {}'
-                 .format(src_tgt.address.reference(), shorten(dep)))
+                 .format(src_tgt.address.spec, shorten(dep)))
         if self._check_missing_deps == 'fatal':
           raise TaskError('Missing deps.')
 
@@ -162,10 +162,10 @@ class JvmDependencyCheck(Task):
         log_fn = (self.context.log.error if self._check_missing_direct_deps == 'fatal'
                   else self.context.log.warn)
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
-          evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
+          evidence_str = '\n'.join(['  {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
           log_fn('Missing direct BUILD dependency {} -> {} because:\n{}'
-                 .format(tgt_pair[0].address, tgt_pair[1].address, evidence_str))
+                 .format(tgt_pair[0].address.spec, tgt_pair[1].address.spec, evidence_str))
         if self._check_missing_direct_deps == 'fatal':
           raise TaskError('Missing direct deps.')
 
@@ -272,14 +272,14 @@ class JvmDependencyCheck(Task):
     if flat_replacements:
       replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))
     unused_msg = (
-        'Unnecessary BUILD dependencies:\n  {}\n{}'
+        'unnecessary BUILD dependencies:\n  {}\n{}'
         '(If you\'re seeing this message in error, you might need to '
         'change the `scope` of the dependencies.)'.format(
           joined_dep_msg(replacement_deps.keys()),
           replacements_msg,
         )
       )
-    log_fn('Target {} had {}\n'.format(target.address.spec, unused_msg))
+    log_fn('Target {} had {}'.format(target.address.spec, unused_msg))
     return True
 
   def _compute_unnecessary_deps(self, target, actual_deps):
