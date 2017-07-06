@@ -4,36 +4,10 @@
 target(
   name = 'all',
   dependencies = [
-    ':analysis',
-    ':analysis_parser',
-    ':analysis_tools',
-    ':anonymizer',
     ':jvm_classpath_publisher',
     ':jvm_compile',
     ':zinc',
   ],
-)
-
-python_library(
-  name = 'analysis',
-  sources = ['analysis.py'],
-)
-
-python_library(
-  name = 'analysis_parser',
-  sources = ['analysis_parser.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-  ]
-)
-
-python_library(
-  name = 'analysis_tools',
-  sources = ['analysis_tools.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:contextutil',
-  ]
 )
 
 python_library(
@@ -98,17 +72,9 @@ python_library(
 )
 
 python_library(
-  name = 'anonymizer',
-  sources = ['anonymizer.py'],
-)
-
-python_library(
   name = 'zinc',
   sources = globs('zinc/*.py'),
   dependencies = [
-    ':analysis',
-    ':analysis_parser',
-    ':analysis_tools',
     ':jvm_compile',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
@@ -119,7 +85,6 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:zinc',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/zinc',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:workunit',
@@ -128,16 +93,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-  ],
-)
-
-python_binary(
-  name = 'anonymize_zinc_analysis',
-  source = 'zinc/bin/anonymize_analysis.py',
-  dependencies = [
-    ':anonymizer',
-    ':zinc',
-    'src/python/pants/util:dirutil',
   ],
 )
 
