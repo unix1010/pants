@@ -13,6 +13,7 @@ from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
+from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.memo import memoized_property
@@ -35,18 +36,12 @@ class AnalysisExtraction(NailgunTask):
   def register_options(cls, register):
     super(AnalysisExtraction, cls).register_options(register)
 
-    register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='ignore',
-             fingerprint=True,
-             help='Controls whether unused deps are checked, and whether they cause warnings or '
-                  'errors. This option uses zinc\'s analysis to determine which deps are unused, '
-                  'and can thus result in false negatives: thus it is disabled by default.')
-
     cls.register_jvm_tool(register,
                           cls._TOOL_NAME,
                           classpath=[
                             JarDependency(org='org.pantsbuild',
                                           name='zinc-extractor_2.11',
-                                          rev='stuhood-zinc-1.0.0-X16-17')
+                                          rev='stuhood-zinc-1.0.0-X16-18')
                           ])
 
   @classmethod
@@ -58,11 +53,6 @@ class AnalysisExtraction(NailgunTask):
   @classmethod
   def product_types(cls):
     return ['classes_by_source', 'product_deps_by_src']
-
-  def _mk_dep_analyzer(self):
-    return JvmDependencyAnalyzer(get_buildroot(),
-                                 self.context.products.get_data('runtime_classpath'),
-                                 self.context.products.get_data('product_deps_by_src'))
 
   def _create_products_if_should_run(self):
     """If this task should run, initialize empty products that it will populate.
@@ -76,15 +66,10 @@ class AnalysisExtraction(NailgunTask):
       make_products = lambda: defaultdict(MultipleRootedProducts)
       self.context.products.safe_create_data('classes_by_source', make_products)
 
-    if self.context.products.is_required_data('product_deps_by_src') \
-        or self._unused_deps_check_enabled:
+    if self.context.products.is_required_data('product_deps_by_src'):
       should_run = True
       self.context.products.safe_create_data('product_deps_by_src', dict)
     return should_run
-
-  @property
-  def _unused_deps_check_enabled(self):
-    return self.get_options().unused_deps != 'ignore'
 
   def _summary_json_file(self, vt):
     return os.path.join(vt.results_dir, 'summary.json')
@@ -123,13 +108,6 @@ class AnalysisExtraction(NailgunTask):
                                 classes_by_source,
                                 product_deps_by_src)
 
-      # Once all products are parsed, if the unused deps check is enabled, run it for
-      # each target.
-      if self._unused_deps_check_enabled:
-        dep_analyzer = self._mk_dep_analyzer()
-        for vt in invalidation_check.invalid_vts:
-          self._check_unused_deps(dep_analyzer, vt.target)
-
   def _extract_analysis(self, target, analysis_file, summary_json_file):
     target_classpath = Zinc.global_instance().compile_classpath(self.context.products,
                                                                 'runtime_classpath',
@@ -147,7 +125,8 @@ class AnalysisExtraction(NailgunTask):
     result = self.runjava(classpath=self.tool_classpath(self._TOOL_NAME),
                           main='org.pantsbuild.zinc.extractor.Main',
                           args=args,
-                          workunit_name=self._TOOL_NAME)
+                          workunit_name=self._TOOL_NAME,
+                          workunit_labels=[WorkUnitLabel.MULTITOOL])
     if result != 0:
       raise TaskError('Failed to parse analysis for {}'.format(target.address.spec),
                       exit_code=result)
@@ -182,32 +161,3 @@ class AnalysisExtraction(NailgunTask):
   def _parse_summary_json(self, summary_json_file):
     with open(summary_json_file) as f:
       return json.load(f, encoding='utf-8')
-
-  def _check_unused_deps(self, dep_analyzer, target):
-    """Uses `product_deps_by_src` to check unused deps and warn or error."""
-    with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
-      # Compute replacement deps.
-      replacement_deps = dep_analyzer.compute_unused_deps(target)
-
-      if not replacement_deps:
-        return
-
-      # Warn or error for unused.
-      def joined_dep_msg(deps):
-        return '\n  '.join('\'{}\','.format(dep.address.spec) for dep in sorted(deps))
-      flat_replacements = set(r for replacements in replacement_deps.values() for r in replacements)
-      replacements_msg = ''
-      if flat_replacements:
-        replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))
-      unused_msg = (
-          'unused dependencies:\n  {}\n{}'
-          '(If you\'re seeing this message in error, you might need to '
-          'change the `scope` of the dependencies.)'.format(
-            joined_dep_msg(replacement_deps.keys()),
-            replacements_msg,
-          )
-        )
-      if self.get_options().unused_deps == 'fatal':
-        raise TaskError(unused_msg)
-      else:
-        self.context.log.warn('Target {} had {}\n'.format(target.address.spec, unused_msg))

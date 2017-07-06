@@ -5,6 +5,7 @@ python_library(
   name = 'dependency_context',
   sources = ['dependency_context.py'],
   dependencies = [
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/build_graph',

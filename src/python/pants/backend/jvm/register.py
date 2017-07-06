@@ -65,6 +65,7 @@ from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
+from pants.backend.jvm.tasks.unused_deps import UnusedDeps
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
@@ -157,7 +158,9 @@ def register_goals():
   # Compile
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
   task(name='zinc', action=ZincCompile).install('compile')
-  task(name='analysis', action=AnalysisExtraction).install('compile')
+
+  # Analysis extraction.
+  task(name='zinc', action=AnalysisExtraction).install('analysis')
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
@@ -205,6 +208,7 @@ def register_goals():
   task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
   task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
+  task(name='unused-deps', action=UnusedDeps, serialize=False).install('lint')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')

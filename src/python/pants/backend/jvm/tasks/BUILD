@@ -43,6 +43,7 @@ target(
     ':scalafmt',
     ':scalastyle',
     ':unpack_jars',
+    ':unused_deps',
     'src/python/pants/backend/jvm/tasks/jvm_compile:all',
   ],
 )
@@ -680,6 +681,17 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/task',
   ]
+)
+
+python_library(
+  name = 'unused_deps',
+  sources = ['unused_deps.py'],
+  dependencies = [
+    ':jvm_dependency_analyzer',
+    'src/python/pants/backend/jvm/subsystems:dependency_context',
+    'src/python/pants/task',
+    'src/python/pants/util:memo',
+  ],
 )
 
 python_library(
