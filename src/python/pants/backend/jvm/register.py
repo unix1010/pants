@@ -156,7 +156,6 @@ def register_goals():
   task(name='provide-tools-jar', action=ProvideToolsJar).install('bootstrap')
 
   # Compile
-  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
   task(name='zinc', action=ZincCompile).install('compile')
 
   # Analysis extraction.
@@ -208,7 +207,7 @@ def register_goals():
   task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
   task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
-  task(name='unused-deps', action=UnusedDeps, serialize=False).install('lint')
+  task(name='jvm-dep-check', action=JvmDependencyCheck, serialize=False).install('lint')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')

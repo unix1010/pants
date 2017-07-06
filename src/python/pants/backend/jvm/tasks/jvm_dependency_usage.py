@@ -157,7 +157,7 @@ class JvmDependencyUsage(Task):
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath, product_deps_by_src)
+    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
     targets = self.context.targets()
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)

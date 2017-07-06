@@ -328,7 +328,9 @@ class JvmCompile(NailgunTaskBase):
 
   @memoized_property
   def _missing_deps_finder(self):
-    return MissingDependencyFinder(self._dep_analyzer, CompileErrorExtractor(
+    dep_analyzer = JvmDependencyAnalyzer(get_buildroot(),
+                                         self.context.products.get_data('runtime_classpath'))
+    return MissingDependencyFinder(dep_analyzer, CompileErrorExtractor(
       self.get_options().class_not_found_error_patterns))
 
   def _compile_context(self, target, target_workdir):

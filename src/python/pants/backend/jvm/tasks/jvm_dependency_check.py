@@ -10,21 +10,31 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.resources import Resources
+from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
+from pants.util.memo import memoized_property
 
 
 class JvmDependencyCheck(Task):
   """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD files."""
+
+  deprecated_scope = 'compile.jvm-dep-check'
+  deprecated_scope_removal_version = '1.6.0.dev0'
 
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='off',
              fingerprint=True,
+             removal_version='1.6.0.dev0',
+             removal_hint='Undeclared transitive dependencies are no longer possible.',
              help='Check for missing dependencies in compiled code. Reports actual '
                   'dependencies A -> B where there is no transitive BUILD file dependency path '
                   'from A to B. If fatal, missing deps are treated as a build error.')
@@ -51,6 +61,10 @@ class JvmDependencyCheck(Task):
                   'legitimately have BUILD dependencies that are unused in practice.')
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmDependencyCheck, cls).subsystem_dependencies() + (DependencyContext,)
+
+  @classmethod
   def skip(cls, options):
     """Return true if the task should be entirely skipped, and thus have no product requirements."""
     values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
@@ -60,8 +74,9 @@ class JvmDependencyCheck(Task):
   def prepare(cls, options, round_manager):
     super(JvmDependencyCheck, cls).prepare(options, round_manager)
     if not cls.skip(options):
-      round_manager.require_data('runtime_classpath')
       round_manager.require_data('product_deps_by_src')
+      round_manager.require_data('runtime_classpath')
+      round_manager.require_data('zinc_analysis')
 
   def __init__(self, *args, **kwargs):
     super(JvmDependencyCheck, self).__init__(*args, **kwargs)
@@ -80,10 +95,23 @@ class JvmDependencyCheck(Task):
   def cache_target_dirs(self):
     return True
 
+  @memoized_property
+  def _analyzer(self):
+    return JvmDependencyAnalyzer(get_buildroot(),
+                                 self.context.products.get_data('runtime_classpath'))
+
   def execute(self):
     if self.skip(self.get_options()):
       return
-    with self.invalidated(self.context.targets(),
+
+    classpath_product = self.context.products.get_data('runtime_classpath')
+    fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
+        classpath_product)
+
+    targets = self.context.products.get_data('zinc_analysis').keys()
+
+    with self.invalidated(targets,
+                          fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
         product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(vt.target)
@@ -142,7 +170,11 @@ class JvmDependencyCheck(Task):
           raise TaskError('Missing direct deps.')
 
       if self._check_unnecessary_deps:
-        raise TaskError('Unnecessary dep warnings not implemented yet.')
+        log_fn = (self.context.log.error if self._check_unnecessary_deps == 'fatal'
+                  else self.context.log.warn)
+        had_unused = self._do_check_unnecessary_deps(src_tgt, actual_deps, log_fn)
+        if had_unused and self._check_unnecessary_deps == 'fatal':
+          raise TaskError('Unnecessary deps.')
 
   def _compute_missing_deps(self, src_tgt, actual_deps):
     """Computes deps that are used by the compiler but not specified in a BUILD file.
@@ -173,9 +205,7 @@ class JvmDependencyCheck(Task):
 
     All paths in the input and output are absolute.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(),
-                                     self.context.products.get_data('runtime_classpath'),
-                                     self.context.products.get_data('product_deps_by_src'))
+    analyzer = self._analyzer
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
@@ -228,3 +258,85 @@ class JvmDependencyCheck(Task):
     return (list(missing_file_deps),
             missing_tgt_deps_map.items(),
             missing_direct_tgt_deps_map.items())
+
+  def _do_check_unnecessary_deps(self, target, actual_deps, log_fn):
+    replacement_deps = self._compute_unnecessary_deps(target, actual_deps)
+    if not replacement_deps:
+      return False
+
+    # Warn or error for unused.
+    def joined_dep_msg(deps):
+      return '\n  '.join('\'{}\','.format(dep.address.spec) for dep in sorted(deps))
+    flat_replacements = set(r for replacements in replacement_deps.values() for r in replacements)
+    replacements_msg = ''
+    if flat_replacements:
+      replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))
+    unused_msg = (
+        'Unnecessary BUILD dependencies:\n  {}\n{}'
+        '(If you\'re seeing this message in error, you might need to '
+        'change the `scope` of the dependencies.)'.format(
+          joined_dep_msg(replacement_deps.keys()),
+          replacements_msg,
+        )
+      )
+    log_fn('Target {} had {}\n'.format(target.address.spec, unused_msg))
+    return True
+
+  def _compute_unnecessary_deps(self, target, actual_deps):
+    """Computes unused deps for the given Target.
+
+    :returns: A set of directly declared but unused targets, and a set of suggested replacements.
+    """
+    # Flatten the product deps of this target.
+    product_deps = set()
+    for dep_entries in actual_deps.values():
+      product_deps.update(dep_entries)
+
+    # Determine which of the DEFAULT deps in the declared set of this target were used.
+    used = set()
+    unused = set()
+    for dep, _ in self._analyzer.resolve_aliases(target, scope=Scopes.DEFAULT):
+      if dep in used or dep in unused:
+        continue
+      # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
+      # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.
+      if isinstance(dep, (Resources, UnpackedJars)):
+        continue
+      # If any of the target's jars or classfiles were used, consider it used.
+      if product_deps.isdisjoint(self._analyzer.files_for_target(dep)):
+        unused.add(dep)
+      else:
+        used.add(dep)
+
+    # If there were no unused deps, break.
+    if not unused:
+      return {}
+
+    # For any deps that were used, count their derived-from targets used as well.
+    # TODO: Refactor to do some of this above once tests are in place.
+    for dep in list(used):
+      for derived_from in dep.derived_from_chain:
+        if derived_from in unused:
+          unused.remove(derived_from)
+          used.add(derived_from)
+
+    # Prune derived targets that would be in the set twice.
+    for dep in list(unused):
+      if set(dep.derived_from_chain) & unused:
+        unused.remove(dep)
+
+    if not unused:
+      return {}
+
+    # For any deps that were not used, determine whether their transitive deps were used, and
+    # recommend those as replacements.
+    replacements = {}
+    for dep in unused:
+      replacements[dep] = set()
+      for t in dep.closure():
+        if t in used or t in unused:
+          continue
+        if not product_deps.isdisjoint(self._analyzer.files_for_target(t)):
+          replacements[dep].add(t.concrete_derived_from)
+
+    return replacements
