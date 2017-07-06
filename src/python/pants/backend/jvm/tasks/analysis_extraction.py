@@ -90,9 +90,9 @@ class AnalysisExtraction(NailgunTask):
     return os.path.join(vt.results_dir, 'summary.json')
 
   @memoized_property
-  def _analysis_by_cp_entry(self):
+  def _analysis_by_runtime_entry(self):
     zinc_analysis = self.context.products.get_data('zinc_analysis')
-    return {cp_entry: analysis_file for cp_entry, analysis_file in zinc_analysis.values()}
+    return {cp_entry: analysis_file for _, cp_entry, analysis_file in zinc_analysis.values()}
 
   def execute(self):
     # If none of our computed products are necessary, return immediately.
@@ -114,7 +114,7 @@ class AnalysisExtraction(NailgunTask):
       # Extract and parse products for any relevant targets.
       for vt in invalidation_check.all_vts:
         summary_json_file = self._summary_json_file(vt)
-        cp_entry, analysis_file = zinc_analysis[vt.target]
+        cp_entry, _, analysis_file = zinc_analysis[vt.target]
         if not vt.valid:
           self._extract_analysis(vt.target, analysis_file, summary_json_file)
         self._register_products(vt.target,
@@ -134,7 +134,8 @@ class AnalysisExtraction(NailgunTask):
     target_classpath = Zinc.global_instance().compile_classpath(self.context.products,
                                                                 'runtime_classpath',
                                                                 target)
-    analysis_by_cp_entry = self._analysis_by_cp_entry
+    analysis_by_cp_entry = self._analysis_by_runtime_entry
+    print('>>> {}'.format(analysis_by_cp_entry))
     upstream_analysis = list(self._upstream_analysis(target_classpath, analysis_by_cp_entry))
     args = [
         '-summary-json', summary_json_file,
@@ -175,8 +176,9 @@ class AnalysisExtraction(NailgunTask):
 
     # Register classfile product dependencies (if requested).
     if product_deps_by_src is not None:
-      product_deps_by_src[target] = \
-          self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
+      # TODO: This is supposed to be per-source, but currently the product is not exposed
+      # that way on the scala side.
+      product_deps_by_src[target] = summary_json['dependencies']
 
   def _parse_summary_json(self, summary_json_file):
     with open(summary_json_file) as f:
