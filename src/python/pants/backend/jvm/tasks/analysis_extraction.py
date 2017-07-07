@@ -154,8 +154,6 @@ class AnalysisExtraction(NailgunTask):
 
     # Register classfile product dependencies (if requested).
     if product_deps_by_src is not None:
-      # TODO: This is supposed to be per-source, but currently the product is not exposed
-      # that way on the scala side.
       product_deps_by_src[target] = summary_json['dependencies']
 
   def _parse_summary_json(self, summary_json_file):

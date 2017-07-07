@@ -65,7 +65,6 @@ from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
-from pants.backend.jvm.tasks.unused_deps import UnusedDeps
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal

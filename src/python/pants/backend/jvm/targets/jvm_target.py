@@ -262,7 +262,7 @@ class JvmTarget(Target, Jarable):
     return self._services
 
   def defaulted_property(self, selector):
-    """Computes a language property setting for the given JvmTarget.
+    """Computes a language property setting for this JvmTarget.
 
     :param selector A function that takes a target or platform and returns the boolean value of the
                     property for that target or platform, or None if that target or platform does
