@@ -123,7 +123,8 @@ class JvmCompile(NailgunTaskBase):
     register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='ignore',
              fingerprint=True,
              removal_version='1.6.0.dev0',
-             removal_hint='Option has moved to the `lint.unused-deps` scope.',
+             removal_hint='Option has moved to `--lint-jvm-dep-check-unnecessary-deps` and is '
+                          'ignored in this location.',
              help='Controls whether unused deps are checked, and whether they cause warnings or '
                   'errors. This option uses zinc\'s analysis to determine which deps are unused, '
                   'and can thus result in false negatives: thus it is disabled by default.')
