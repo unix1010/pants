@@ -23,7 +23,6 @@ from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.mapper import ResolveError
-from pants.engine.nodes import Return
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
@@ -88,7 +87,7 @@ class LegacyBuildGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    for product in roots.values():
+    for product in roots:
       # We have a successful HydratedTargets value (for a particular input Spec).
       for hydrated_target in product.dependencies:
         target_adaptor = hydrated_target.adaptor
@@ -248,13 +247,10 @@ class LegacyBuildGraph(BuildGraph):
       )
 
     # Update the base class indexes for this request.
-    address_entries = dict(zip(subjects, product_results[BuildFileAddresses]))
-    target_entries = dict(zip(subjects, product_results[HydratedTargets]))
-
-    self._index(target_entries)
+    self._index(product_results[HydratedTargets])
 
     yielded_addresses = set()
-    for subject, product in address_entries.items():
+    for subject, product in zip(subjects, product_results[BuildFileAddresses]):
       if not product.dependencies:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(subject))

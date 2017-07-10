@@ -583,10 +583,6 @@ class JvmCompile(NailgunTaskBase):
         progress_message,
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
-        # The compiler may delete classfiles, then later exit on a compilation error. Then if the
-        # change triggering the error is reverted, we won't rebuild to restore the missing
-        # classfiles. So we force-invalidate here, to be on the safe side.
-        vts.force_invalidate()
         if self.get_options().capture_classpath:
           self._record_compile_classpath(classpath, vts.targets, outdir)
 
@@ -787,10 +783,14 @@ class JvmCompile(NailgunTaskBase):
         for classname, candidates in missing_dep_suggestions.items():
           suggested_deps.add(list(candidates)[0])
           self.context.log.info('  {}: {}'.format(classname, ', '.join(candidates)))
+
+        # We format the suggested deps with single quotes and commas so that
+        # they can be easily cut/pasted into a BUILD file.
+        formatted_suggested_deps = ["'%s'," % dep for dep in suggested_deps]
         suggestion_msg = (
           '\nIf the above information is correct, '
           'please add the following to the dependencies of ({}):\n  {}\n'
-            .format(target.address.spec, '\n  '.join(sorted(list(suggested_deps))))
+            .format(target.address.spec, '\n  '.join(sorted(list(formatted_suggested_deps))))
         )
         self.context.log.info(suggestion_msg)
 

@@ -10,10 +10,23 @@ import java.util.Optional
 
 import scala.compat.java8.OptionConverters._
 
-import sbt.internal.inc.{Analysis, AnalysisStore, CompanionsStore, FileBasedStore, Locate}
+import sbt.internal.inc.{
+  Analysis,
+  AnalysisStore => AnalysisStoreObj,
+  CompanionsStore,
+  FileAnalysisStore,
+  Locate
+}
 import sbt.util.Logger
 import xsbti.api.Companions
-import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup}
+import xsbti.compile.{
+  AnalysisContents,
+  AnalysisStore,
+  CompileAnalysis,
+  DefinesClass,
+  MiniSetup,
+  PerClasspathEntryLookup
+}
 
 import org.pantsbuild.zinc.cache.Cache.Implicits
 import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
@@ -85,23 +98,25 @@ class AnalysisMap private[AnalysisMap] (
   }
 
   def cachedStore(cacheFile: File): AnalysisStore =
-    AnalysisStore.sync(
+    AnalysisStoreObj.sync(
       new AnalysisStore {
-        val fileStore = mkFileBasedStore(cacheFile)
+        private val fileStore = mkFileAnalysisStore(cacheFile)
 
-        def set(analysis: CompileAnalysis, setup: MiniSetup) {
-          fileStore.set(analysis, setup)
+        override def set(analysis: AnalysisContents) {
+          fileStore.set(analysis)
           FileFPrint.fprint(cacheFile).foreach { fprint =>
-            AnalysisMap.analysisCache.put(fprint, Some((analysis, setup)))
+            AnalysisMap.analysisCache.put(fprint, Some(analysis))
           }
         }
 
-        def get(): Option[(CompileAnalysis, MiniSetup)] = {
-          FileFPrint.fprint(cacheFile) flatMap { fprint =>
-            AnalysisMap.analysisCache.getOrElseUpdate(fprint) {
-              fileStore.get
+        override def get(): Optional[AnalysisContents] = {
+          val entry =
+            FileFPrint.fprint(cacheFile) flatMap { fprint =>
+              AnalysisMap.analysisCache.getOrElseUpdate(fprint) {
+                fileStore.get.asScala
+              }
             }
-          }
+          entry.asJava
         }
       }
     )
@@ -112,10 +127,10 @@ class AnalysisMap private[AnalysisMap] (
       if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
         throw new IOException(s"Analysis at $cacheFPrint has changed since startup!")
       }
-      mkFileBasedStore(cacheFPrint.file).get()
-    }.map(_._1)
+      mkFileAnalysisStore(cacheFPrint.file).get().asScala
+    }.map(_.getAnalysis)
 
-  private def mkFileBasedStore(file: File): AnalysisStore = FileBasedStore(file, analysisMappers)
+  private def mkFileAnalysisStore(file: File): AnalysisStore = FileAnalysisStore(file, analysisMappers)
 }
 
 object AnalysisMap {
@@ -123,9 +138,10 @@ object AnalysisMap {
   /**
    * Static cache for compile analyses. Values must be Options because in get() we don't yet
    * know if, on a cache miss, the underlying file will yield a valid Analysis.
+   * TODO: Remove the Option and fail noisily.
    */
   private val analysisCache =
-    Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](analysisCacheLimit)
+    Cache[FileFPrint, Option[AnalysisContents]](analysisCacheLimit)
 
   def create(options: AnalysisOptions): AnalysisMap =
     new AnalysisMap(
