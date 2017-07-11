@@ -26,7 +26,7 @@ class Zinc(Subsystem, JvmToolMixin):
 
   ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
-  _ZINC_VERSION = 'stuhood-zinc-1.0.0-X19-M1'
+  _ZINC_VERSION = 'stuhood-zinc-1.0.0-X19-M1-4'
 
   @classmethod
   def register_options(cls, register):
