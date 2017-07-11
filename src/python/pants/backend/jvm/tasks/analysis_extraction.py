@@ -26,8 +26,6 @@ class AnalysisExtraction(NailgunTask):
   # that re-computing it from the zinc analysis (which _is_ cached) when necessary is fine.
   create_target_dirs = True
 
-  _TOOL_NAME = 'zinc-extractor'
-
   @classmethod
   def subsystem_dependencies(cls):
     return super(AnalysisExtraction, cls).subsystem_dependencies() + (DependencyContext, Zinc)
@@ -35,14 +33,6 @@ class AnalysisExtraction(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(AnalysisExtraction, cls).register_options(register)
-
-    cls.register_jvm_tool(register,
-                          cls._TOOL_NAME,
-                          classpath=[
-                            JarDependency(org='org.pantsbuild',
-                                          name='zinc-extractor_2.11',
-                                          rev='stuhood-zinc-1.0.0-X16-18')
-                          ])
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -70,6 +60,10 @@ class AnalysisExtraction(NailgunTask):
       should_run = True
       self.context.products.safe_create_data('product_deps_by_src', dict)
     return should_run
+
+  @memoized_property
+  def _extractor_classpath(self):
+    return Zinc.global_instance().extractor_classpath(self.context.products)
 
   def _summary_json_file(self, vt):
     return os.path.join(vt.results_dir, 'summary.json')
@@ -122,10 +116,10 @@ class AnalysisExtraction(NailgunTask):
       ]
     args.extend(Zinc.global_instance().rebase_map_args)
 
-    result = self.runjava(classpath=self.tool_classpath(self._TOOL_NAME),
-                          main='org.pantsbuild.zinc.extractor.Main',
+    result = self.runjava(classpath=self._extractor_classpath,
+                          main=Zinc.ZINC_EXTRACT_MAIN,
                           args=args,
-                          workunit_name=self._TOOL_NAME,
+                          workunit_name=Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                           workunit_labels=[WorkUnitLabel.MULTITOOL])
     if result != 0:
       raise TaskError('Failed to parse analysis for {}'.format(target.address.spec),

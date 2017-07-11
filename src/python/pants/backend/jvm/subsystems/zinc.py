@@ -21,7 +21,12 @@ class Zinc(Subsystem, JvmToolMixin):
   options_scope = 'zinc'
 
   ZINC_COMPILE_MAIN = 'org.pantsbuild.zinc.compiler.Main'
+  ZINC_EXTRACT_MAIN = 'org.pantsbuild.zinc.extractor.Main'
   DEFAULT_CONFS = ['default']
+
+  ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
+
+  _ZINC_VERSION = 'stuhood-zinc-1.0.0-X19-M1'
 
   @classmethod
   def register_options(cls, register):
@@ -67,7 +72,7 @@ class Zinc(Subsystem, JvmToolMixin):
                           **kwargs)
 
     def sbt_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X16-SNAPSHOT-2', **kwargs)
+      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X19-M1', **kwargs)
 
     shader_rules = [
         # The compiler-interface and compiler-bridge tool jars carry xsbt and
@@ -82,14 +87,14 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'stuhood-zinc-1.0.0-X16-17'),
+                            JarDependency('org.pantsbuild', 'zinc-compiler_2.12', Zinc._ZINC_VERSION),
                           ],
                           **kwargs)
 
     cls.register_jvm_tool(register,
                           'compiler-bridge',
                           classpath=[
-                            sbt_jar(name='compiler-bridge_2.11',
+                            sbt_jar(name='compiler-bridge_2.12',
                                     classifier='sources',
                                     intransitive=True)
                           ],
@@ -105,6 +110,14 @@ class Zinc(Subsystem, JvmToolMixin):
                           main='no.such.main.Main',
                           custom_rules=shader_rules,
                           **kwargs)
+
+    cls.register_jvm_tool(register,
+                          Zinc.ZINC_EXTRACTOR_TOOL_NAME,
+                          classpath=[
+                            JarDependency(org='org.pantsbuild',
+                                          name='zinc-extractor_2.12',
+                                          rev=Zinc._ZINC_VERSION)
+                          ])
 
   def __init__(self, *args, **kwargs):
     super(Zinc, self).__init__(*args, **kwargs)
@@ -136,6 +149,9 @@ class Zinc(Subsystem, JvmToolMixin):
                                                                   scope=scope)
     classpaths = cp('javac-plugin-dep') + cp('scalac-plugin-dep')
     return [(conf, jar) for conf in cls.DEFAULT_CONFS for jar in classpaths]
+
+  def extractor_classpath(self, products):
+    return self.tool_classpath_from_products(self.ZINC_EXTRACTOR_TOOL_NAME, products)
 
   def compile_classpath(self, products, classpath_product_key, target):
     """Compute the compile classpath for the given target."""
