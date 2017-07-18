@@ -26,7 +26,7 @@ class Zinc(Subsystem, JvmToolMixin):
 
   ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
-  _ZINC_VERSION = 'stuhood-zinc-1.0.0-X19-M1-4'
+  _ZINC_VERSION = 'stuhood-zinc-1.0.0-X20-1'
 
   @classmethod
   def register_options(cls, register):
@@ -72,7 +72,7 @@ class Zinc(Subsystem, JvmToolMixin):
                           **kwargs)
 
     def sbt_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X19-M1', **kwargs)
+      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X20', **kwargs)
 
     shader_rules = [
         # The compiler-interface and compiler-bridge tool jars carry xsbt and
@@ -87,14 +87,14 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc-compiler_2.12', Zinc._ZINC_VERSION),
+                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', Zinc._ZINC_VERSION),
                           ],
                           **kwargs)
 
     cls.register_jvm_tool(register,
                           'compiler-bridge',
                           classpath=[
-                            sbt_jar(name='compiler-bridge_2.12',
+                            sbt_jar(name='compiler-bridge_2.11',
                                     classifier='sources',
                                     intransitive=True)
                           ],
@@ -115,7 +115,7 @@ class Zinc(Subsystem, JvmToolMixin):
                           Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                           classpath=[
                             JarDependency(org='org.pantsbuild',
-                                          name='zinc-extractor_2.12',
+                                          name='zinc-extractor_2.11',
                                           rev=Zinc._ZINC_VERSION)
                           ])
 
