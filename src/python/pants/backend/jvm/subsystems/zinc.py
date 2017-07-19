@@ -26,8 +26,6 @@ class Zinc(Subsystem, JvmToolMixin):
 
   ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
-  _ZINC_VERSION = 'stuhood-zinc-1.0.0-X20-3'
-
   @classmethod
   def register_options(cls, register):
     super(Zinc, cls).register_options(register)
@@ -87,7 +85,7 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', Zinc._ZINC_VERSION),
+                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.1'),
                           ],
                           **kwargs)
 
@@ -114,9 +112,7 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                           classpath=[
-                            JarDependency(org='org.pantsbuild',
-                                          name='zinc-extractor_2.11',
-                                          rev=Zinc._ZINC_VERSION)
+                            JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.1')
                           ])
 
   def __init__(self, *args, **kwargs):
