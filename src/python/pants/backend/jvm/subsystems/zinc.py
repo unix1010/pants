@@ -147,7 +147,9 @@ class Zinc(Subsystem, JvmToolMixin):
     return [(conf, jar) for conf in cls.DEFAULT_CONFS for jar in classpaths]
 
   def extractor_classpath(self, products):
-    return self.tool_classpath_from_products(self.ZINC_EXTRACTOR_TOOL_NAME, products)
+    return self.tool_classpath_from_products(products,
+                                             self.ZINC_EXTRACTOR_TOOL_NAME,
+                                             scope=self.options_scope)
 
   def compile_classpath(self, products, classpath_product_key, target):
     """Compute the compile classpath for the given target."""
