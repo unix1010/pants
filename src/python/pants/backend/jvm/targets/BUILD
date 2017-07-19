@@ -36,7 +36,6 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
-    'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',

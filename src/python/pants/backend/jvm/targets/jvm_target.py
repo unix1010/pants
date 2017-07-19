@@ -9,7 +9,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.deprecated import deprecated_conditional
@@ -29,7 +28,7 @@ class JvmTarget(Target, Jarable):
 
   @classmethod
   def subsystems(cls):
-    return super(JvmTarget, cls).subsystems() + (Java, JvmPlatform, ScalaPlatform)
+    return super(JvmTarget, cls).subsystems() + (Java, JvmPlatform)
 
   def __init__(self,
                address=None,
@@ -260,23 +259,3 @@ class JvmTarget(Target, Jarable):
   @property
   def services(self):
     return self._services
-
-  def defaulted_property(self, selector):
-    """Computes a language property setting for this JvmTarget.
-
-    :param selector A function that takes a target or platform and returns the boolean value of the
-                    property for that target or platform, or None if that target or platform does
-                    not directly define the property.
-
-    If the target does not override the language property, returns true iff the property
-    is true for any of the matched languages for the target.
-    """
-    if selector(self) is not None:
-      return selector(self)
-
-    prop = False
-    if self.has_sources('.java'):
-      prop |= selector(Java.global_instance())
-    if self.has_sources('.scala'):
-      prop |= selector(ScalaPlatform.global_instance())
-    return prop

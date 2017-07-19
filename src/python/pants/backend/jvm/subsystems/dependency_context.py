@@ -9,6 +9,8 @@ import hashlib
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -38,6 +40,10 @@ class DependencyContext(Subsystem):
 
   _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
   _compiler_plugin_types = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(DependencyContext, cls).subsystem_dependencies() + (Java, ScalaPlatform)
 
   @classmethod
   def _get_synthetic_target(cls, target, thrift_dep):
@@ -107,6 +113,26 @@ class DependencyContext(Subsystem):
   def create_fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareFingerprintStrategy(classpath_products, self)
 
+  def defaulted_property(self, target, selector):
+    """Computes a language property setting for the given JvmTarget.
+
+    :param selector A function that takes a target or platform and returns the boolean value of the
+                    property for that target or platform, or None if that target or platform does
+                    not directly define the property.
+
+    If the target does not override the language property, returns true iff the property
+    is true for any of the matched languages for the target.
+    """
+    if selector(target) is not None:
+      return selector(target)
+
+    prop = False
+    if target.has_sources('.java'):
+      prop |= selector(Java.global_instance())
+    if target.has_sources('.scala'):
+      prop |= selector(ScalaPlatform.global_instance())
+    return prop
+
 
 class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
@@ -136,7 +162,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
     return hasher.hexdigest()
 
   def direct(self, target):
-    return target.defaulted_property(lambda x: x.strict_deps)
+    return self._dep_context.defaulted_property(target, lambda x: x.strict_deps)
 
   def dependencies(self, target):
     if self.direct(target):

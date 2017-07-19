@@ -707,9 +707,10 @@ class JvmCompile(NailgunTaskBase):
           # Work around https://github.com/pantsbuild/pants/issues/3670
           safe_rmtree(ctx.classes_dir)
 
+        dep_context = DependencyContext.global_instance()
         tgt, = vts.targets
-        fatal_warnings = tgt.defaulted_property(lambda x: x.fatal_warnings)
-        zinc_file_manager = tgt.defaulted_property(lambda x: x.zinc_file_manager)
+        fatal_warnings = dep_context.defaulted_property(tgt, lambda x: x.fatal_warnings)
+        zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
         self._compile_vts(vts,
                           ctx.target,
                           ctx.sources,

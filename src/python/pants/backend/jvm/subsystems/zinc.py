@@ -163,7 +163,7 @@ class Zinc(Subsystem, JvmToolMixin):
     """
     classpath_product = products.get_data(classpath_product_key)
 
-    if target.defaulted_property(lambda x: x.strict_deps):
+    if DependencyContext.global_instance().defaulted_property(target, lambda x: x.strict_deps):
       dependencies = DependencyContext.global_instance().strict_dependencies(target)
     else:
       dependencies = DependencyContext.global_instance().all_dependencies(target)

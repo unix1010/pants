@@ -5,6 +5,8 @@ python_library(
   name = 'dependency_context',
   sources = ['dependency_context.py'],
   dependencies = [
+    ':java',
+    ':scala_platform',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
@@ -129,7 +131,9 @@ python_library(
   name = 'zinc',
   sources = ['zinc.py'],
   dependencies = [
+    ':dependency_context',
     ':jvm_tool_mixin',
+    ':shader',
     'src/python/pants/subsystem',
   ]
 )
