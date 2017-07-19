@@ -26,7 +26,7 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class SyntheticTargetNotFound(Exception):
-  pass
+  """Exports were resolved for a thrift target which hasn't had a synthetic target generated yet."""
 
 
 class DependencyContext(Subsystem):
@@ -38,8 +38,8 @@ class DependencyContext(Subsystem):
 
   options_scope = 'jvm-dependency-context'
 
-  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
-  _compiler_plugin_types = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
+  _TARGET_CLOSURE_KWARGS = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
+  _COMPILER_PLUGIN_TYPES = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -99,15 +99,15 @@ class DependencyContext(Subsystem):
     of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
     """
     for declared in self._resolve_strict_dependencies(target):
-      if isinstance(declared, self._compiler_plugin_types):
-        for r in declared.closure(bfs=True, **self._target_closure_kwargs):
+      if isinstance(declared, self._COMPILER_PLUGIN_TYPES):
+        for r in declared.closure(bfs=True, **self._TARGET_CLOSURE_KWARGS):
           yield r
       else:
         yield declared
 
   def all_dependencies(self, target):
     """All transitive dependencies of the context's target."""
-    for dep in target.closure(bfs=True, **self._target_closure_kwargs):
+    for dep in target.closure(bfs=True, **self._TARGET_CLOSURE_KWARGS):
       yield dep
 
   def create_fingerprint_strategy(self, classpath_products):
@@ -170,7 +170,9 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
     return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
 
   def __hash__(self):
+    # NB: FingerprintStrategy requires a useful override of eq/hash.
     return hash(type(self))
 
   def __eq__(self, other):
+    # NB: See __hash__.
     return type(self) == type(other)

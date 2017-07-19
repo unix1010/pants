@@ -285,7 +285,7 @@ class JvmDependencyCheck(Task):
   def _compute_unnecessary_deps(self, target, actual_deps):
     """Computes unused deps for the given Target.
 
-    :returns: A set of directly declared but unused targets, and a set of suggested replacements.
+    :returns: A dict of directly declared but unused targets, to sets of suggested replacements.
     """
     # Flatten the product deps of this target.
     product_deps = set()

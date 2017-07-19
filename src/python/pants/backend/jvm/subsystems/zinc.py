@@ -123,9 +123,9 @@ class Zinc(Subsystem, JvmToolMixin):
   def rebase_map_args(self):
     """We rebase known stable paths in zinc analysis to make it portable across machines."""
     rebases = {
-        self.dist.real_home: '/dev/null/java_home/',
-        get_buildroot(): '/dev/null/buildroot/',
-        self.get_options().pants_workdir: '/dev/null/workdir/',
+        self.dist.real_home: '/dev/null/remapped_by_pants/java_home/',
+        get_buildroot(): '/dev/null/remapped_by_pants/buildroot/',
+        self.get_options().pants_workdir: '/dev/null/remapped_by_pants/workdir/',
       }
     return (
         '-rebase-map',
