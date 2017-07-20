@@ -45,11 +45,6 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     self.target_path = 'testprojects/src/scala/org/pantsbuild/testproject/custom_scala_platform'
     self.tmp_build_file_path = 'BUILD.CustomScalaIntegTests'
 
-  def test_working_210(self):
-    pants_run = self.pants_run(options=['--scala-platform-version=2.10'])
-    self.assert_success(pants_run)
-    assert re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data), pants_run.stdout_data
-
   def test_working_211(self):
     pants_run = self.pants_run(options=['--scala-platform-version=2.11'])
     self.assert_success(pants_run)
@@ -59,32 +54,6 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.pants_run(options=['--scala-platform-version=2.12'])
     self.assert_success(pants_run)
     assert re.search('bootstrap-scalastyle_2_12', pants_run.stdout_data), pants_run.stdout_data
-
-  def test_working_custom_210(self):
-    custom_buildfile = os.path.join(self.target_path, 'custom_210_scalatools.build')
-    with self.tmp_buildfile(custom_buildfile):
-      pants_run = self.pants_run(
-        options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.10']
-      )
-      self.assert_success(pants_run)
-      assert not re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data)
-      assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
-
-  def test_repl_working_custom_210(self):
-    custom_buildfile = os.path.join(self.target_path, 'custom_210_scalatools.build')
-    with self.tmp_buildfile(custom_buildfile):
-      pants_run = self.run_repl(
-        'examples/src/scala/org/pantsbuild/example/hello/welcome',
-        dedent("""
-            import org.pantsbuild.example.hello.welcome.WelcomeEverybody
-            println(WelcomeEverybody("World" :: Nil).head)
-          """),
-        options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.10']
-      )
-
-      # Make sure this didn't happen:
-      # FAILURE: No bootstrap callback registered for //:scala-repl in scala-platform
-      self.assert_success(pants_run)
 
   def test_repl_working_custom_211(self):
     custom_buildfile = os.path.join(self.target_path, 'custom_211_scalatools.build')
@@ -111,6 +80,16 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       assert not re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data)
       assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
+
+  def test_working_custom_212(self):
+    custom_buildfile = os.path.join(self.target_path, 'custom_212_scalatools.build')
+    with self.tmp_buildfile(custom_buildfile):
+      pants_run = self.pants_run(
+        options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.12']
+      )
+      self.assert_success(pants_run)
+      assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
+      assert not re.search('bootstrap-scalastyle_2_12', pants_run.stdout_data)
 
   def test_missing_compiler(self):
     custom_buildfile = os.path.join(self.target_path, 'custom_211_missing_compiler.build')
