@@ -133,7 +133,7 @@ class Zinc(Subsystem, JvmToolMixin):
       )
 
   @classmethod
-  def _extra_compile_time_classpath_elements(cls, jvm_tool_mixin_instance, products):
+  def _compiler_plugins_cp_entries(cls, jvm_tool_mixin_instance, products):
     """Any additional global compiletime classpath entries.
 
     TODO: Switch to instance memoized_property after 1.6.0.dev0.
@@ -151,12 +151,21 @@ class Zinc(Subsystem, JvmToolMixin):
                                              self.ZINC_EXTRACTOR_TOOL_NAME,
                                              scope=self.options_scope)
 
-  def compile_classpath(self, products, classpath_product_key, target):
+  def compile_classpath(self, products, classpath_product_key, target, extra_cp_entries=None):
     """Compute the compile classpath for the given target."""
-    return Zinc.compile_classpath_for(self, products, classpath_product_key, target)
+    return Zinc.compile_classpath_for(self,
+                                      products,
+                                      classpath_product_key,
+                                      target,
+                                      extra_cp_entries=extra_cp_entries)
 
   @classmethod
-  def compile_classpath_for(cls, jvm_tool_mixin_instance, products, classpath_product_key, target):
+  def compile_classpath_for(cls,
+                            jvm_tool_mixin_instance,
+                            products,
+                            classpath_product_key,
+                            target,
+                            extra_cp_entries=None):
     """Compute the compile classpath for the given target.
 
     TODO: Merge with `compile_classpath` after 1.6.0.dev0.
@@ -167,10 +176,13 @@ class Zinc(Subsystem, JvmToolMixin):
       dependencies = DependencyContext.global_instance().strict_dependencies(target)
     else:
       dependencies = DependencyContext.global_instance().all_dependencies(target)
-    extra_compile_time_classpath_elements = cls._extra_compile_time_classpath_elements(jvm_tool_mixin_instance,
-                                                                                        products)
+
+    all_extra_cp_entries = list(cls._compiler_plugins_cp_entries(jvm_tool_mixin_instance,
+                                                                 products))
+    if extra_cp_entries:
+      all_extra_cp_entries.extend(extra_cp_entries)
 
     return ClasspathUtil.compute_classpath(dependencies,
                                            classpath_product,
-                                           extra_compile_time_classpath_elements,
+                                           all_extra_cp_entries,
                                            cls.DEFAULT_CONFS)

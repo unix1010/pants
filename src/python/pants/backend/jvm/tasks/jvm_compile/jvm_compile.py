@@ -282,6 +282,16 @@ class JvmCompile(NailgunTaskBase):
 
   # Subclasses may override.
   # ------------------------
+  def extra_compile_time_classpath_elements(self):
+    """Extra classpath elements common to all compiler invocations.
+
+    E.g., jars for compiler plugins.
+
+    These are added at the end of the classpath, after any dependencies, so that if they
+    overlap with any explicit dependencies, the compiler sees those first.  This makes
+    missing dependency accounting much simpler.
+    """
+    return []
 
   def write_extra_resources(self, compile_context):
     """Writes any extra, out-of-band resources for a target to its classes directory.
@@ -698,7 +708,8 @@ class JvmCompile(NailgunTaskBase):
         cp_entries.extend(Zinc.compile_classpath_for(self._zinc_tools,
                                                      self.context.products,
                                                      classpath_product_key,
-                                                     ctx.target))
+                                                     ctx.target,
+                                                     extra_cp_entries=self._extra_compile_time_classpath))
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         if not should_compile_incrementally(vts, ctx):
@@ -803,6 +814,16 @@ class JvmCompile(NailgunTaskBase):
     if hasattr(target, 'java_sources') and target.java_sources:
       sources.extend(resolve_target_sources(target.java_sources))
     return sources
+
+  @memoized_property
+  def _extra_compile_time_classpath(self):
+    """Compute any extra compile-time-only classpath elements."""
+    def extra_compile_classpath_iter():
+      for conf in self._confs:
+        for jar in self.extra_compile_time_classpath_elements():
+          yield (conf, jar)
+
+    return list(extra_compile_classpath_iter())
 
   @memoized_method
   def _plugin_targets(self, compiler):
