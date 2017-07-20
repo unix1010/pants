@@ -39,6 +39,7 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:base_test',
   ],
+  timeout=30,
 )
 
 python_tests(
@@ -48,7 +49,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout=180,
+  timeout=360,
 )
 
 python_tests(
