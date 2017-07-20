@@ -166,8 +166,8 @@ class JvmToolMixin(object):
     :API: public
     """
     super(JvmToolMixin, self).__init__(*args, **kwargs)
-    self.set_distribution()    # Use default until told otherwise.
     # TODO: Choose default distribution based on options.
+    self._dist = None
 
   def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
     try:
@@ -178,6 +178,9 @@ class JvmToolMixin(object):
 
   @property
   def dist(self):
+    if self._dist is None:
+      # Use default until told otherwise.
+      self.set_distribution()
     return self._dist
 
   def tool_jar_from_products(self, products, key, scope):
