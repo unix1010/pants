@@ -13,10 +13,10 @@ from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.util.memo import memoized_property
-from pants.base.exceptions import TaskError
 
 
 class AnalysisExtraction(NailgunTask):
