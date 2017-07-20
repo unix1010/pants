@@ -8,10 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import zipfile
 from contextlib import contextmanager
 
-from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
-from pants.build_graph.address import Address
-from pants.build_graph.aliased_target import AliasTarget
-from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
 
 

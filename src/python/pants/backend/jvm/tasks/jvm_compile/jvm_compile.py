@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
-import hashlib
 import os
 from collections import defaultdict
 from multiprocessing import cpu_count
@@ -570,13 +569,6 @@ class JvmCompile(NailgunTaskBase):
             and workunit.outcome() == WorkUnit.FAILURE):
           logs.append(outpath)
     return logs
-
-  def check_artifact_cache(self, vts):
-    """Localizes the fetched analysis for targets we found in the cache."""
-    def post_process(cached_vts):
-      for vt in cached_vts:
-        cc = self._compile_context(vt.target, vt.results_dir)
-    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process)
 
   def _create_empty_products(self):
     if self.context.products.is_required_data('zinc_analysis'):

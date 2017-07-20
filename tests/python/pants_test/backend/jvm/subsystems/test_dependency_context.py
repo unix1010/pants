@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import mock
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants_test.base_test import BaseTest

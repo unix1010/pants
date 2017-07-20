@@ -14,9 +14,6 @@ python_library(
   name = 'compile_context',
   sources = ['compile_context.py'],
   dependencies = [
-    'src/python/pants/backend/codegen/thrift/java',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
   ]
 )

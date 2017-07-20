@@ -16,7 +16,6 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
-from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.memo import memoized_method, memoized_property
 

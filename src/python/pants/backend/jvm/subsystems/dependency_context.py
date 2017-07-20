@@ -13,7 +13,6 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import FingerprintStrategy
@@ -82,7 +81,7 @@ class DependencyContext(Subsystem):
           yield dep
       else:
         if isinstance(export, JavaThriftLibrary):
-          synthetic_target = _get_synthetic_target(target, export)
+          synthetic_target = cls._get_synthetic_target(target, export)
           if synthetic_target is None:
             raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(export))
           yield synthetic_target
