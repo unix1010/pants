@@ -8,8 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import mock
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jvm_compile.compile_context import strict_dependencies
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class CompileContextTest(BaseTest):
@@ -64,10 +65,12 @@ class CompileContextTest(BaseTest):
 
   def test_resolve_logic(self):
     self.generate_targets()
-    dep_context = mock.Mock()
-    dep_context.compiler_plugin_types = ()
-    self.assertEqual(set(strict_dependencies(self.lib_b, dep_context)), {self.lib_a, self.lib_aa})
-    self.assertEqual(set(strict_dependencies(self.lib_c, dep_context)), {self.lib_b, self.lib_a})
-    self.assertEqual(set(strict_dependencies(self.lib_c_alias, dep_context)), {self.lib_c, self.lib_b, self.lib_a})
-    self.assertEqual(set(strict_dependencies(self.lib_d, dep_context)), {self.lib_c, self.lib_b, self.lib_a})
-    self.assertEqual(set(strict_dependencies(self.lib_e, dep_context)), {self.lib_d, self.lib_c, self.lib_b, self.lib_a})
+    init_subsystem(DependencyContext)
+    dep_context = DependencyContext.global_instance()
+    def strict_dependencies(t):
+      return dep_context.strict_dependencies(t)
+    self.assertEqual(set(strict_dependencies(self.lib_b)), {self.lib_a, self.lib_aa})
+    self.assertEqual(set(strict_dependencies(self.lib_c)), {self.lib_b, self.lib_a})
+    self.assertEqual(set(strict_dependencies(self.lib_c_alias)), {self.lib_c, self.lib_b, self.lib_a})
+    self.assertEqual(set(strict_dependencies(self.lib_d)), {self.lib_c, self.lib_b, self.lib_a})
+    self.assertEqual(set(strict_dependencies(self.lib_e)), {self.lib_d, self.lib_c, self.lib_b, self.lib_a})
