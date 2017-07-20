@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
@@ -89,7 +90,7 @@ class JvmDependencyCheck(Task):
     self._check_missing_deps = munge_flag('missing_deps')
     self._check_missing_direct_deps = munge_flag('missing_direct_deps')
     self._check_unnecessary_deps = munge_flag('unnecessary_deps')
-    self._target_whitelist = self.get_options().missing_deps_whitelist
+    self._target_whitelist = [Address.parse(s) for s in self.get_options().missing_deps_whitelist]
 
   @property
   def cache_target_dirs(self):
@@ -137,7 +138,7 @@ class JvmDependencyCheck(Task):
       def filter_whitelisted(missing_deps):
         # Removing any targets that exist in the whitelist from the list of dependency issues.
         return [(tgt_pair, evidence) for (tgt_pair, evidence) in missing_deps
-                            if tgt_pair[0].address.spec not in self._target_whitelist]
+                            if tgt_pair[0].address not in self._target_whitelist]
 
       missing_tgt_deps = filter_whitelisted(missing_tgt_deps)
 
