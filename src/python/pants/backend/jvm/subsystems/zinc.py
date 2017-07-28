@@ -85,7 +85,7 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'stuhood-zinc-1.0.0-RC3'),
+                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.2'),
                           ],
                           **kwargs)
 
