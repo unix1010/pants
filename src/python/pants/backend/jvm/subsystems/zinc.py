@@ -70,7 +70,7 @@ class Zinc(Subsystem, JvmToolMixin):
                           **kwargs)
 
     def sbt_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X20', **kwargs)
+      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-RC3', **kwargs)
 
     shader_rules = [
         # The compiler-interface and compiler-bridge tool jars carry xsbt and
@@ -85,7 +85,7 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.1'),
+                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'stuhood-zinc-1.0.0-RC3'),
                           ],
                           **kwargs)
 
