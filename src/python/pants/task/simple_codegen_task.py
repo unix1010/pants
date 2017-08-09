@@ -248,7 +248,7 @@ class SimpleCodegenTask(Task):
       address=self._get_synthetic_address(target, target_workdir),
       target_type=self.synthetic_target_type(target),
       dependencies=self.synthetic_target_extra_dependencies(target, target_workdir),
-      sources=sources,
+      sources=list(self.find_sources(target, target_workdir)),
       derived_from=target,
       **copied_attributes
     )
