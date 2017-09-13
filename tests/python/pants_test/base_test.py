@@ -20,6 +20,7 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.target_roots import LiteralTargetRoots
@@ -253,6 +254,7 @@ class BaseTest(unittest.TestCase):
 
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
+    self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.project_tree = FileSystemProjectTree(self.build_root)
 
     self._build_graph = None
@@ -354,7 +356,6 @@ class BaseTest(unittest.TestCase):
     context = create_context_from_options(options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
-                                          build_file_parser=self.build_file_parser,
                                           address_mapper=self.address_mapper,
                                           console_outstream=console_outstream,
                                           workspace=workspace)
