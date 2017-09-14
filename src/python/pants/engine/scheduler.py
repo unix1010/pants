@@ -423,6 +423,7 @@ class LocalScheduler(object):
       filenames = tuple(filenames) + ('', '.')
     with self._product_graph_lock:
       invalidated = self._scheduler.invalidate(filenames)
+      self._maybe_visualize()
       logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
       return invalidated
 
@@ -439,6 +440,12 @@ class LocalScheduler(object):
 
   def pre_fork(self):
     self._scheduler.pre_fork()
+
+  def _maybe_visualize(self):
+    if self._scheduler.visualize_to_dir() is not None:
+      name = 'graph.{0:03d}.dot'.format(self._run_count)
+      self._run_count += 1
+      self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -458,10 +465,7 @@ class LocalScheduler(object):
       runnable_count = execution_stat.runnable_count
       scheduling_iterations = execution_stat.scheduling_iterations
 
-      if self._scheduler.visualize_to_dir() is not None:
-        name = 'run.{}.dot'.format(self._run_count)
-        self._run_count += 1
-        self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
+      self._maybe_visualize()
 
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '

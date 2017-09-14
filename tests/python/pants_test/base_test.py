@@ -117,7 +117,20 @@ class BaseTest(unittest.TestCase):
     path = os.path.join(self.build_root, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
+    if self._graph_helper is not None:
+      self._graph_helper.scheduler.invalidate_files(relpath)
     return path
+
+  def create_files(self, path, files):
+    """Writes to a file under the buildroot with contents same as file name.
+
+    :API: public
+
+     path:  The relative path to the file from the build root.
+     files: List of file names.
+    """
+    for f in files:
+      self.create_file(os.path.join(path, f), contents=f)
 
   def create_workdir_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the work directory.
@@ -256,6 +269,7 @@ class BaseTest(unittest.TestCase):
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.project_tree = FileSystemProjectTree(self.build_root)
 
+    self._graph_helper = None
     self._build_graph = None
     self._address_mapper = None
 
@@ -275,7 +289,7 @@ class BaseTest(unittest.TestCase):
     return set(scan())
 
   def _initialize_engine(self):
-    graph_helper = EngineInitializer.setup_legacy_graph(
+    self._graph_helper = EngineInitializer.setup_legacy_graph(
         self.pants_ignore_patterns,
         self.pants_workdir,
         native=init_native(),
@@ -285,7 +299,7 @@ class BaseTest(unittest.TestCase):
         subproject_roots=None,
       )
 
-    self._build_graph, self._address_mapper = graph_helper.create_build_graph(
+    self._build_graph, self._address_mapper = self._graph_helper.create_build_graph(
         LiteralTargetRoots([]),
         self.build_root,
       )
@@ -398,17 +412,6 @@ class BaseTest(unittest.TestCase):
       self.build_graph.inject_address_closure(address)
     targets = [self.build_graph.get_target(address) for address in addresses]
     return targets
-
-  def create_files(self, path, files):
-    """Writes to a file under the buildroot with contents same as file name.
-
-    :API: public
-
-     path:  The relative path to the file from the build root.
-     files: List of file names.
-    """
-    for f in files:
-      self.create_file(os.path.join(path, f), contents=f)
 
   def create_library(self, path, target_type, name, sources=None, **kwargs):
     """Creates a library target of given type at the BUILD file at path with sources
