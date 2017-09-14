@@ -31,7 +31,6 @@ from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class TestGenerator(object):

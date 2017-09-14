@@ -39,7 +39,6 @@ python_library(
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test/engine:util',
     'tests/python/pants_test/option/util',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
