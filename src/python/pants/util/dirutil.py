@@ -451,8 +451,10 @@ def recursive_dirname(f):
         'a'
         ''
   """
-  while f:
+  prev = None
+  while f != prev:
     yield f
+    prev = f
     f = os.path.dirname(f)
   yield ''
 
