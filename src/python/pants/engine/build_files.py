@@ -22,6 +22,7 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.engine.struct import Struct
+from pants.util.dirutil import recursive_dirname
 from pants.util.objects import datatype
 
 
@@ -291,26 +292,11 @@ def spec_to_globs(address_mapper, spec):
     patterns = [
       join(f, pattern)
       for pattern in address_mapper.build_patterns
-      for f in _recursive_dirname(spec.directory)
+      for f in recursive_dirname(spec.directory)
     ]
   else:
     raise ValueError('Unrecognized Spec type: {}'.format(spec))
   return PathGlobs.create(directory, include=patterns, exclude=[])
-
-
-def _recursive_dirname(f):
-  """Given a relative path like 'a/b/c/d', yield all ascending path components like:
-
-        'a/b/c/d'
-        'a/b/c'
-        'a/b'
-        'a'
-        ''
-  """
-  while f:
-    yield f
-    f = dirname(f)
-  yield ''
 
 
 BuildFilesCollection = Collection.of(BuildFiles)

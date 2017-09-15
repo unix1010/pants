@@ -27,7 +27,7 @@ from pants.init.target_roots import LiteralTargetRoots
 from pants.init.util import clean_global_runtime_state
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
+from pants.util.dirutil import recursive_dirname, safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -105,6 +105,26 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(path)
     return path
 
+  def _collect_invalid_for(self, relpath):
+    """Before touching the given path (relative to the build root) computes all affected paths.
+
+    Many python operations implicitly create parent directories, so we assume that touching a
+    file located below directories that do not currently exist will result in their creation.
+
+    This emulates (to some degree) the types of events we'd expect to see from watchman when a
+    user creates or updates a file. A created/removed file/directory results in two events: one
+    for the parent, and one for the child. An updated file on the other hand only sends a single
+    event (for the child and not its parent).
+    """
+    # Always invalidate the file itself, because if it is not being created, it is at least
+    # being updated.
+    yield relpath
+    # Invalidate any non-existent parents.
+    for p in list(recursive_dirname(relpath))[1:]:
+      if not os.path.isdir(os.path.join(self.build_root, p)):
+        yield p
+        yield os.path.dirname(p)
+
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
 
@@ -114,11 +134,11 @@ class BaseTest(unittest.TestCase):
     contents: A string containing the contents of the file - '' by default..
     mode:     The mode to write to the file in - over-write by default.
     """
+    if self._graph_helper is not None:
+      self._graph_helper.scheduler.invalidate_files(list(self._collect_invalid_for(relpath)))
     path = os.path.join(self.build_root, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
-    if self._graph_helper is not None:
-      self._graph_helper.scheduler.invalidate_files(relpath)
     return path
 
   def create_files(self, path, files):
