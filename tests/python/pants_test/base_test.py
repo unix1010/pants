@@ -389,6 +389,7 @@ class BaseTest(unittest.TestCase):
     context = create_context_from_options(options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
+                                          build_file_parser=self.build_file_parser,
                                           address_mapper=self.address_mapper,
                                           console_outstream=console_outstream,
                                           workspace=workspace)
