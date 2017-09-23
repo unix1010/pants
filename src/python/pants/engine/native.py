@@ -169,6 +169,9 @@ Scheduler* scheduler_create(Tasks*,
                             Function,
                             Function,
                             Function,
+                            Function,
+                            TypeConstraint,
+                            TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
@@ -685,6 +688,7 @@ class Native(object):
                     construct_dir,
                     construct_file,
                     construct_link,
+                    construct_process_result,
                     constraint_has_products,
                     constraint_address,
                     constraint_variants,
@@ -694,7 +698,9 @@ class Native(object):
                     constraint_files_content,
                     constraint_dir,
                     constraint_file,
-                    constraint_link):
+                    constraint_link,
+                    constraint_process_request,
+                    constraint_process_result):
     """Create and return an ExternContext and native Scheduler."""
 
     def tc(constraint):
@@ -711,6 +717,7 @@ class Native(object):
         Function(self.context.to_id(construct_dir)),
         Function(self.context.to_id(construct_file)),
         Function(self.context.to_id(construct_link)),
+        Function(self.context.to_id(construct_process_result)),
         # TypeConstraints.
         tc(constraint_address),
         tc(constraint_has_products),
@@ -722,6 +729,8 @@ class Native(object):
         tc(constraint_dir),
         tc(constraint_file),
         tc(constraint_link),
+        tc(constraint_process_request),
+        tc(constraint_process_result),
         # Types.
         TypeId(self.context.to_id(six.text_type)),
         TypeId(self.context.to_id(six.binary_type)),

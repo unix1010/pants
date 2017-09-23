@@ -23,6 +23,7 @@ from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, Ju
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
+from pants.engine.process_executor import create_process_rules
 from pants.engine.scheduler import LocalScheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -160,7 +161,8 @@ class EngineInitializer(object):
     tasks = (
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
-      create_graph_rules(address_mapper, symbol_table)
+      create_graph_rules(address_mapper, symbol_table) +
+      create_process_rules()
     )
 
     scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native, include_trace_on_error=include_trace_on_error)

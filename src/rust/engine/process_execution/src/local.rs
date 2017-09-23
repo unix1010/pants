@@ -6,7 +6,7 @@ use super::{ExecuteProcessRequest, ExecuteProcessResult};
 ///
 /// Runs a command on this machine in the pwd.
 ///
-pub fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, Error> {
+pub fn run_command(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, Error> {
   Command::new(&req.argv[0])
     .args(&req.argv[1..])
     .env_clear()
@@ -24,14 +24,14 @@ pub fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessR
 
 #[cfg(test)]
 mod tests {
-  use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_locally};
+  use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command};
   use std::collections::BTreeMap;
   use test_utils::{owned_string_vec, as_byte_owned_vec};
 
   #[test]
   #[cfg(unix)]
   fn stdout() {
-    let result = run_command_locally(ExecuteProcessRequest {
+    let result = run_command(ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
     });
@@ -49,7 +49,7 @@ mod tests {
   #[test]
   #[cfg(unix)]
   fn stdout_and_stderr_and_exit_code() {
-    let result = run_command_locally(ExecuteProcessRequest {
+    let result = run_command(ExecuteProcessRequest {
       argv: owned_string_vec(
         &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
       ),
@@ -73,7 +73,7 @@ mod tests {
     env.insert("FOO".to_string(), "foo".to_string());
     env.insert("BAR".to_string(), "not foo".to_string());
 
-    let result = run_command_locally(ExecuteProcessRequest {
+    let result = run_command(ExecuteProcessRequest {
       argv: owned_string_vec(&["/usr/bin/env"]),
       env: env.clone(),
     });
@@ -109,15 +109,15 @@ mod tests {
       }
     }
 
-    let result1 = run_command_locally(make_request());
-    let result2 = run_command_locally(make_request());
+    let result1 = run_command(make_request());
+    let result2 = run_command(make_request());
 
     assert_eq!(result1.unwrap(), result2.unwrap());
   }
 
   #[test]
   fn binary_not_found() {
-    run_command_locally(ExecuteProcessRequest {
+    run_command(ExecuteProcessRequest {
       argv: owned_string_vec(&["echo", "-n", "foo"]),
       env: BTreeMap::new(),
     }).expect_err("Want Err");
