@@ -37,8 +37,8 @@ use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
               ExternContext, Externs, IdToStrExtern, InvokeRunnable, LogExtern, KeyForExtern,
               ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern, SatisfiedByExtern,
-              SatisfiedByTypeExtern, StoreListExtern, StoreBytesExtern, TypeIdBuffer,
-              ValForExtern, ValToStrExtern};
+              SatisfiedByTypeExtern, StoreI32Extern, StoreListExtern, StoreBytesExtern,
+              TypeIdBuffer, ValForExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
@@ -126,6 +126,7 @@ pub extern "C" fn externs_set(
   satisfied_by_type: SatisfiedByTypeExtern,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
+  store_i32: StoreI32Extern,
   project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -146,6 +147,7 @@ pub extern "C" fn externs_set(
     satisfied_by_type,
     store_list,
     store_bytes,
+    store_i32,
     project,
     project_ignoring_type,
     project_multi,
