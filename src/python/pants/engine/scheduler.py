@@ -321,7 +321,8 @@ class LocalScheduler(object):
            particular (possibly synthetic) product.
     :param rules: A set of Rules which is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
-    :param work_dir: The pants work dir.
+    :param work_dir: The pants work dir - a temporary directory in which the scheduler can place
+           internal files.
     :param native: An instance of engine.native.Native.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
@@ -517,7 +518,7 @@ class LocalScheduler(object):
     if throw_root_states:
       if self._include_trace_on_error:
         cumulative_trace = '\n'.join(self.trace())
-        raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
+        raise ExecutionError('Received unexpected Throw state(s): {}\n:\n{}'.format(throw_root_states, cumulative_trace))
 
       if len(throw_root_states) == 1:
         raise throw_root_states[0].exc
