@@ -241,7 +241,7 @@ def addresses_from_address_families(address_mapper, address_families, spec):
      - the Spec matches no addresses for SingleAddresses.
   """
   if not address_families:
-    raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
+    raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
 
   def exclude_address(address):
     if address_mapper.exclude_patterns:

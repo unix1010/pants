@@ -86,7 +86,7 @@ class GraphTargetScanFailureTests(GraphTestBase):
       with self.graph_helper() as graph_helper:
         self.create_graph_from_specs(graph_helper, ['no-such-path:'])
 
-    self.assertIn('Path "no-such-path" contains no BUILD files',
+    self.assertIn('Path "no-such-path" does not contain any BUILD files',
                   str(cm.exception))
 
   def test_with_existing_directory_with_no_build_files_fails(self):
@@ -94,7 +94,7 @@ class GraphTargetScanFailureTests(GraphTestBase):
       with self.graph_helper() as graph_helper:
         self.create_graph_from_specs(graph_helper, ['build-support/bin::'])
 
-    self.assertIn('Path "build-support/bin" contains no BUILD files',
+    self.assertIn('Path "build-support/bin" does not contain any BUILD files',
                   str(cm.exception))
 
   def test_inject_bad_dir(self):
@@ -104,7 +104,7 @@ class GraphTargetScanFailureTests(GraphTestBase):
 
         graph.inject_address_closure(Address('build-support/bin','wat'))
 
-    self.assertIn('Path "build-support/bin" contains no BUILD files',
+    self.assertIn('Path "build-support/bin" does not contain any BUILD files',
                   str(cm.exception))
 
 
