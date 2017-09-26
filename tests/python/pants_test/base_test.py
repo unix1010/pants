@@ -116,14 +116,14 @@ class BaseTest(unittest.TestCase):
     for the parent, and one for the child. An updated file on the other hand only sends a single
     event (for the child and not its parent).
     """
-    # Always invalidate the file itself, because if it is not being created, it is at least
-    # being updated.
-    yield relpath
-    # Invalidate any non-existent parents.
-    for p in list(recursive_dirname(relpath))[1:]:
-      if not os.path.isdir(os.path.join(self.build_root, p)):
+    # Invalidate for any path components which will be directly or indirectly created. The first
+    # component is always considered to have been invalidated.
+    transitively_invalidated = True
+    for p in recursive_dirname(relpath):
+      directly_invalidated = not os.path.exists(os.path.join(self.build_root, p))
+      if directly_invalidated or transitively_invalidated:
         yield p
-        yield os.path.dirname(p)
+      transitively_invalidated = directly_invalidated
 
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
