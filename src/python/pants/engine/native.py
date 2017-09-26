@@ -452,7 +452,10 @@ class ObjectIdMap(object):
 
   def put(self, obj):
     new_id = self._next_id
-    oid = self._obj_to_id.setdefault(obj, new_id)
+    try:
+      oid = self._obj_to_id.setdefault(obj, new_id)
+    except Exception as e:
+      raise Exception('Failed to memoize object `{}`: {}'.format(obj, e))
     if oid is not new_id:
       # Object already existed.
       return oid

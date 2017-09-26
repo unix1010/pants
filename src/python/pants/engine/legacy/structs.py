@@ -99,14 +99,8 @@ class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'pat
   :param path_globs: A PathGlobs describing included files.
   """
 
-  def __eq__(self, other):
-    return type(self) == type(other) and self.address == other.address and self.arg == other.arg
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
-    return hash(self.address)
+    return hash((self.address, self.arg))
 
   def __repr__(self):
     return str(self)
@@ -146,12 +140,6 @@ class JunitTestsAdaptor(TargetAdaptor):
 
 class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
-
-  def __eq__(self, other):
-    return type(self) == type(other) and self.address == other.address
-
-  def __ne__(self, other):
-    return not (self == other)
 
   def __hash__(self):
     return hash(self.address)
