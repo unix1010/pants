@@ -318,7 +318,11 @@ class BaseGlobs(Locatable, AbstractClass):
   @property
   def filespecs(self):
     """Return a filespecs dict representing both globs and excludes."""
-    return {'globs': self._file_globs, 'exclude': self._exclude_filespecs}
+    filespecs = {'globs': self._file_globs}
+    exclude_filespecs = self._exclude_filespecs
+    if exclude_filespecs:
+      filespecs['exclude'] = exclude_filespecs
+    return filespecs
 
   @property
   def _exclude_filespecs(self):

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import unittest
 from collections import defaultdict
 
 import six
@@ -255,9 +256,10 @@ class BuildGraphTest(BaseTest):
                            '  dependencies=["non-existent-path:b"],'
                            ')')
     with self.assertRaisesRegexp(AddressLookupError,
-                                 '.*/non-existent-path does not contain any BUILD files.'):
+                                 '.*non-existent-path.*does not contain any BUILD files.'):
       self.inject_address_closure('//:a')
 
+  @unittest.skip(reason='TODO: #4515')
   def test_invalid_address_two_hops(self):
     self.add_to_build_file('BUILD',
                            'target(name="a", '
@@ -285,6 +287,7 @@ class BuildGraphTest(BaseTest):
     )
     self.inject_address_closure('//:synth_library_address')
 
+  @unittest.skip(reason='TODO: #4515')
   def test_invalid_address_two_hops_same_file(self):
     self.add_to_build_file('BUILD',
                            'target(name="a", '

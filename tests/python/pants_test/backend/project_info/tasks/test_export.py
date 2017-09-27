@@ -202,7 +202,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/x')
 
     self.assertEqual(
-      {'globs': ['src/python/x/*.py'], 'exclude': []},
+      {'globs': ['src/python/x/*.py']},
       result['targets']['src/python/x:x']['globs']
     )
 
@@ -373,7 +373,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/y')
 
     self.assertEqual(
-      {'globs': ['src/python/y/**/*.py'], 'exclude': []},
+      {'globs': ['src/python/y/**/*.py']},
       result['targets']['src/python/y:y']['globs']
     )
 
@@ -382,7 +382,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/y:y2')
 
     self.assertEqual(
-      {'globs': ['src/python/y/subdir/**/*.py'], 'exclude': []},
+      {'globs': ['src/python/y/subdir/**/*.py']},
       result['targets']['src/python/y:y2']['globs']
     )
 
@@ -391,7 +391,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/y:y3')
 
     self.assertEqual(
-      {'globs': ['src/python/y/Test*.py'], 'exclude': []},
+      {'globs': ['src/python/y/Test*.py']},
       result['targets']['src/python/y:y3']['globs']
     )
 
@@ -400,7 +400,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/z')
 
     self.assertEqual(
-      {'globs': ['src/python/z/**/*.py'], 'exclude': []},
+      {'globs': ['src/python/z/**/*.py']},
       result['targets']['src/python/z:z']['globs']
     )
 
