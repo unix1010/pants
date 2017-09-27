@@ -197,6 +197,7 @@ class FilesetRelPathWrapperTest(BaseTest):
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
+  @unittest.skip(reason='TODO: #4760')
   def test_parent_dir_bracket(self):
     self.add_to_build_file('y/BUILD', dedent("""
       dummy_target(name="y", sources=globs("../[dir1, dir2]/File.scala"))
@@ -217,14 +218,8 @@ class FilesetRelPathWrapperTest(BaseTest):
   def test_rglob_follows_symlinked_dirs_by_default(self):
     self.add_to_build_file('z/w/BUILD', 'dummy_target(name="w", sources=rglobs("*.java"))')
     graph = self.context().scan()
-    relative_sources = list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
-    assert ['y/fleem.java', 'y/morx.java', 'foo.java'] == relative_sources
-
-  def test_rglob_respects_follow_links_override(self):
-    self.add_to_build_file('z/w/BUILD',
-                           'dummy_target(name="w", sources=rglobs("*.java", follow_links=False))')
-    graph = self.context().scan()
-    assert ['foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
+    relative_sources = set(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
+    self.assertEquals({'y/fleem.java', 'y/morx.java', 'foo.java'}, relative_sources)
 
 
 class FilesetWithSpecTest(BaseTest):
