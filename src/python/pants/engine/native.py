@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import importlib
 import logging
 import os
+import platform
 import sys
 import sysconfig
 import threading
@@ -579,8 +580,9 @@ class Native(object):
   def binary(self):
     """Load and return the path to the native engine binary."""
     lib_name = '{}.so'.format(NATIVE_ENGINE_MODULE)
+    resource_name = '{}.{}'.format(NATIVE_ENGINE_MODULE, "dylib" if platform.system() == "Darwin" else "so")
     lib_path = os.path.join(safe_mkdtemp(), lib_name)
-    with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
+    with closing(pkg_resources.resource_stream(__name__, resource_name)) as input_fp:
       with open(lib_path, 'wb') as output_fp:
         output_fp.write(input_fp.read())
     return lib_path

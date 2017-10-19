@@ -192,5 +192,8 @@ python_library(
 
 resources(
   name='native_engine_shared_library',
-  sources=['native_engine.so']
+  sources=[
+      'native_engine.so',
+      'native_engine.dylib',
+  ]
 )
