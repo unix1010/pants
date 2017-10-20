@@ -4,14 +4,9 @@
 javac_plugin(
   name = 'simple_javac_plugin',
   sources = ['SimpleJavacPlugin.java'],
-  dependencies = [':simple_javac_plugin_helper'],
+  dependencies = [],
   classname = 'org.pantsbuild.example.javac.plugin.SimpleJavacPlugin',
   scope='compile',
-)
-
-java_library(
-  name = 'simple_javac_plugin_helper',
-  sources = ['SimpleJavacPluginHelper.java'],
 )
 
 # The plugin will only run on this target if told to via options.
