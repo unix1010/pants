@@ -512,7 +512,7 @@ class ZincCompile(BaseZincCompile):
 
   def extra_compile_time_classpath_elements(self):
     """Classpath entries containing plugins."""
-    return self.tool_classpath('javac-plugin-dep') + self.tool_classpath('scalac-plugin-dep')
+    return self.tool_classpath('javac-plugin-dep')
 
   def select(self, target):
     # Require that targets are marked for JVM compilation, to differentiate from
