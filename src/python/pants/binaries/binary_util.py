@@ -34,6 +34,7 @@ _DEFAULT_PATH_BY_ID = {
   ('darwin', '14'): ('mac', '10.10'),
   ('darwin', '15'): ('mac', '10.11'),
   ('darwin', '16'): ('mac', '10.12'),
+  ('darwin', '17'): ('mac', '10.13'),
 }
 
 
@@ -50,20 +51,10 @@ class BinaryUtil(object):
     """
     :API: public
     """
+    # N.B. `BinaryUtil` sources all of its options from bootstrap options, so that
+    # `BinaryUtil` instances can be created prior to `Subsystem` bootstrapping. So
+    # this options scope is unused, but required to remain a `Subsystem`.
     options_scope = 'binaries'
-
-    @classmethod
-    def register_options(cls, register):
-      register('--baseurls', type=list, advanced=True,
-               default=['https://s3.amazonaws.com/binaries.pantsbuild.org'],
-               help='List of urls from which binary tools are downloaded.  Urls are searched in '
-                    'order until the requested path is found.')
-      register('--fetch-timeout-secs', type=int, default=30, advanced=True,
-               help='Timeout in seconds for url reads when fetching binary tools from the '
-                    'repos specified by --baseurls')
-      register('--path-by-id', type=dict, advanced=True,
-               help='Maps output of uname for a machine to a binary search path.  e.g. '
-               '{ ("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"] }')
 
     @classmethod
     def create(cls):
@@ -72,8 +63,12 @@ class BinaryUtil(object):
       """
       # NB: create is a class method to ~force binary fetch location to be global.
       options = cls.global_instance().get_options()
-      return BinaryUtil(options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir,
-                        options.path_by_id)
+      return BinaryUtil(
+        options.binaries_baseurls,
+        options.binaries_fetch_timeout_secs,
+        options.pants_bootstrapdir,
+        options.binaries_path_by_id
+      )
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
@@ -108,8 +103,9 @@ class BinaryUtil(object):
     try:
       middle_path = self._path_by_id[os_id]
     except KeyError:
-      raise self.MissingMachineInfo('Update --binaries-path-by-id to find binaries for {!r}'
-                                    .format(os_id))
+      raise self.MissingMachineInfo('Unable to find binary {name} version {version}. '
+                                    'Update --binaries-path-by-id to find binaries for {os_id!r}'
+                                    .format(name=name, version=version, os_id=os_id))
     return os.path.join(supportdir, *(middle_path + (version, name)))
 
   def __init__(self, baseurls, timeout_secs, bootstrapdir, path_by_id=None):

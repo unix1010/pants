@@ -10,7 +10,6 @@ import os
 import threading
 import time
 from collections import defaultdict
-from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
@@ -86,30 +85,30 @@ class WrappedNativeScheduler(object):
     self._register_rules(rule_index)
 
     self._scheduler = native.new_scheduler(
-        self._tasks,
-        self._root_subject_types,
-        build_root,
-        work_dir,
-        ignore_patterns,
-        Snapshot,
-        _Snapshots,
-        FileContent,
-        FilesContent,
-        Path,
-        Dir,
-        File,
-        Link,
-        has_products_constraint,
-        constraint_for(Address),
-        constraint_for(Variants),
-        constraint_for(PathGlobs),
-        constraint_for(Snapshot),
-        constraint_for(_Snapshots),
-        constraint_for(FilesContent),
-        constraint_for(Dir),
-        constraint_for(File),
-        constraint_for(Link),
-      )
+      self._tasks,
+      self._root_subject_types,
+      build_root,
+      work_dir,
+      ignore_patterns,
+      Snapshot,
+      _Snapshots,
+      FileContent,
+      FilesContent,
+      Path,
+      Dir,
+      File,
+      Link,
+      has_products_constraint,
+      constraint_for(Address),
+      constraint_for(Variants),
+      constraint_for(PathGlobs),
+      constraint_for(Snapshot),
+      constraint_for(_Snapshots),
+      constraint_for(FilesContent),
+      constraint_for(Dir),
+      constraint_for(File),
+      constraint_for(Link),
+    )
 
   def _root_type_ids(self):
     return self._to_ids_buf(sorted(self._root_subject_types))
@@ -350,6 +349,10 @@ class LocalScheduler(object):
 
     self._scheduler.assert_ruleset_valid()
 
+  @property
+  def lock(self):
+    return self._product_graph_lock
+
   def trace(self):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
     with self._product_graph_lock:
@@ -400,11 +403,6 @@ class LocalScheduler(object):
     """
     return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
 
-  @contextmanager
-  def locked(self):
-    with self._product_graph_lock:
-      yield
-
   def root_entries(self, execution_request):
     """Returns the roots for the given ExecutionRequest as a list of tuples of:
          ((subject, product), State)
@@ -416,13 +414,12 @@ class LocalScheduler(object):
             self._execution_request, execution_request))
       return self._scheduler.root_entries(execution_request)
 
-  def invalidate_files(self, filenames):
+  def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    # NB: Watchman will never trigger an invalidation event for the root directory that
-    # is being watched. Instead, we treat any invalidation of a path directly in the
-    # root directory as an invalidation of the root.
-    if any(os.path.dirname(f) in ('', '.') for f in filenames):
-      filenames = tuple(filenames) + ('', '.')
+    # NB: Watchman no longer triggers events when children are created/deleted under a directory,
+    # so we always need to invalidate the direct parent as well.
+    filenames = set(direct_filenames)
+    filenames.update(os.path.dirname(f) for f in direct_filenames)
     with self._product_graph_lock:
       invalidated = self._scheduler.invalidate(filenames)
       logger.debug('invalidated %d nodes for: %s', invalidated, filenames)

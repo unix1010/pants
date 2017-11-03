@@ -34,7 +34,6 @@ python_library(
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:selectors',
-    'src/python/pants/engine:storage',
     'src/python/pants/engine:struct',
   ]
 )
@@ -61,6 +60,7 @@ python_library(
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test/engine:util',
   ]
 )

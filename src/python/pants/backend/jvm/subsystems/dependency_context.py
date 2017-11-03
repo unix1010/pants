@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 
+from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -37,76 +38,18 @@ class DependencyContext(Subsystem):
 
   options_scope = 'jvm-dependency-context'
 
-  _TARGET_CLOSURE_KWARGS = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
-  _COMPILER_PLUGIN_TYPES = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
+  target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
+  compiler_plugin_types = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
+  alias_types = (AliasTarget, Target)
+  codegen_types = (JavaThriftLibrary, JavaProtobufLibrary)
 
   @classmethod
   def subsystem_dependencies(cls):
     return super(DependencyContext, cls).subsystem_dependencies() + (Java, ScalaPlatform)
 
-  @classmethod
-  def _get_synthetic_target(cls, target, thrift_dep):
-    """Find a thrift target's corresponding synthetic target."""
-    for dep in target.dependencies:
-      if dep != thrift_dep and dep.is_synthetic and dep.derived_from == thrift_dep:
-        return dep
-    return None
-
-  @classmethod
-  def _resolve_strict_dependencies(cls, target):
-    for declared in target.dependencies:
-      if type(declared) in (AliasTarget, Target):
-        # Is an alias. Recurse to expand.
-        for r in cls._resolve_strict_dependencies(declared):
-          yield r
-      else:
-        yield declared
-
-      for export in cls._resolve_exports(declared):
-        yield export
-
-  @classmethod
-  def _resolve_exports(cls, target):
-    for export in getattr(target, 'exports', []):
-      if not isinstance(export, Target):
-        addr = Address.parse(export, relative_to=target.address.spec_path)
-        export = target._build_graph.get_target(addr)
-        if export not in target.dependencies:
-          # A target can only export its dependencies.
-          raise TargetDefinitionException(target, 'Invalid exports: "{}" is not a dependency of {}'.format(export, target))
-
-      if type(export) in (AliasTarget, Target):
-        # If exported target is an alias, expand its dependencies.
-        for dep in cls._resolve_strict_dependencies(export):
-          yield dep
-      else:
-        if isinstance(export, JavaThriftLibrary):
-          synthetic_target = cls._get_synthetic_target(target, export)
-          if synthetic_target is None:
-            raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(export))
-          yield synthetic_target
-        else:
-          yield export
-
-        for exp in cls._resolve_exports(export):
-          yield exp
-
-  def strict_dependencies(self, target):
-    """Compute the 'strict' compile target dependencies for this target.
-
-    Results the declared dependencies of a target after alias expansion, with the addition
-    of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
-    """
-    for declared in self._resolve_strict_dependencies(target):
-      if isinstance(declared, self._COMPILER_PLUGIN_TYPES):
-        for r in declared.closure(bfs=True, **self._TARGET_CLOSURE_KWARGS):
-          yield r
-      else:
-        yield declared
-
   def all_dependencies(self, target):
     """All transitive dependencies of the context's target."""
-    for dep in target.closure(bfs=True, **self._TARGET_CLOSURE_KWARGS):
+    for dep in target.closure(bfs=True, **self.target_closure_kwargs):
       yield dep
 
   def create_fingerprint_strategy(self, classpath_products):
@@ -165,7 +108,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
 
   def dependencies(self, target):
     if self.direct(target):
-      return self._dep_context.strict_dependencies(target)
+      return target.strict_dependencies(self._dep_context)
     return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
 
   def __hash__(self):

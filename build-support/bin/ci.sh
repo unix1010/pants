@@ -21,7 +21,6 @@ function usage() {
   echo " -k           skip bootstrapped pants self compile check"
   echo " -m           skip sanity checks of bootstrapped pants and repo BUILD"
   echo "              files"
-  echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
   echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
@@ -32,6 +31,7 @@ function usage() {
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
+  echo " -e           skip rust tests"
   echo " -y SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running contrib python tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
@@ -58,7 +58,7 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
+while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -66,12 +66,12 @@ while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
     b) skip_bootstrap="true" ;;
     k) bootstrap_compile_args=() ;;
     m) skip_sanity_checks="true" ;;
-    s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
     j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
+    e) skip_rust_tests="true" ;;
     n) skip_contrib="true" ;;
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
@@ -167,14 +167,6 @@ if [[ "${skip_lint:-false}" == "false" ]]; then
   end_travis_section
 fi
 
-if [[ "${skip_distribution:-false}" == "false" ]]; then
-  # N.B. Defer start_travis_section to those within release.sh, since we can't nest.
-  banner "Running pants distribution tests"
-  (
-    ./build-support/bin/release.sh -n
-  ) || die "Failed to create pants distributions."
-fi
-
 if [[ "${skip_docs:-false}" == "false" ]]; then
   start_travis_section "DocGen" "Running site doc generation test"
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
@@ -205,7 +197,6 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
     ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
-      --coverage=pants \
       --test-pytest-test-shard=${python_unit_shard} \
       tests/python::
   ) || die "Core python test failure"
@@ -225,6 +216,15 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   ) || die "Contrib python test failure"
   end_travis_section
 fi
+
+if [[ "${skip_rust_tests:-false}" == "false" ]]; then
+  start_travis_section "RustTests" "Running Pants rust tests"
+  (
+    "${REPO_ROOT}/src/rust/engine/run-all-tests.sh"
+  ) || die "Pants rust test failure"
+  end_travis_section
+fi
+
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
   if [[ "0/1" != "${python_intg_shard}" ]]; then

@@ -15,10 +15,11 @@ python_tests(
   sources = ['test_binary_create.py'],
   dependencies = [
     ':jvm_binary_task_test_base',
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:binary_create',
+    'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -27,15 +28,16 @@ python_tests(
   name = 'bootstrap_jvm_tools',
   sources = ['test_bootstrap_jvm_tools.py'],
   dependencies = [
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/java/distribution',
+    'src/python/pants/java/jar',
     'src/python/pants/java:executor',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -187,7 +189,7 @@ python_tests(
 
 python_tests(
   name = 'coverage',
-  sources = ['coverage/test_base.py'],
+  sources = ['coverage/test_cobertura.py'],
   dependencies = [
     ':jvm_binary_task_test_base',
     'src/python/pants/java/jar',
@@ -393,10 +395,10 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:timeout',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-    'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
@@ -405,10 +407,11 @@ python_tests(
   sources = ['test_junit_run_integration.py'],
   dependencies = [
     ':missing_jvm_check',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 600
 )
 
 python_tests(
@@ -627,7 +630,18 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:scalafmt',
     'tests/python/pants_test:int-test',
   ],
-  timeout=120,
+  timeout=240,
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'scalafix',
+  sources = ['test_scalafix.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:scalafix',
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=240,
   tags = {'integration'},
 )
 

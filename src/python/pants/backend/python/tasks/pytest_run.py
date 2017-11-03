@@ -9,7 +9,6 @@ import itertools
 import os
 import re
 import shutil
-import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -31,7 +30,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.process_handler import SubprocessProcessHandler
+from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants.util.strutil import safe_shlex_split
 
 
@@ -229,7 +228,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     return self.get_options().level == 'debug'
 
   def _generate_coverage_config(self, source_mappings):
-    # For the benefit of macos testing, add the 'real' path the the directory as an equivalent.
+    # For the benefit of macos testing, add the 'real' path the directory as an equivalent.
     def add_realpath(path):
       realpath = os.path.realpath(path)
       if realpath != canonical and realpath not in alternates:

@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import signal
-import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -16,8 +15,11 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.pantsd.subsystem.subprocess import Subprocess
+from pants.init.subprocess import Subprocess
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
+from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -226,7 +228,7 @@ class ProcessManager(ProcessMetadataManager):
     :param str metadata_base_dir: The overridden base directory for process metadata.
     """
     super(ProcessManager, self).__init__(metadata_base_dir)
-    self._name = name
+    self._name = name.lower().strip()
     self._pid = pid
     self._socket = socket
     self._socket_type = socket_type
@@ -243,6 +245,17 @@ class ProcessManager(ProcessMetadataManager):
   def process_name(self):
     """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
     return self._process_name
+
+  @memoized_property
+  def process_lock(self):
+    """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
+    safe_mkdir(self._metadata_base_dir)
+    return OwnerPrintingInterProcessFileLock(
+      # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
+      # via `ProcessMetadataManager._get_metadata_dir_by_name()`) because of a need to purge
+      # the named metadata dir on startup to avoid stale metadata reads.
+      os.path.join(self._metadata_base_dir, '.lock.{}'.format(self._name))
+    )
 
   @property
   def cmdline(self):
@@ -301,8 +314,9 @@ class ProcessManager(ProcessMetadataManager):
     """Wait up to a given timeout for a process to write socket info."""
     return self.await_metadata_by_name(self._name, 'socket', timeout, self._socket_type)
 
-  def write_pid(self, pid):
+  def write_pid(self, pid=None):
     """Write the current processes PID to the pidfile location"""
+    pid = pid or os.getpid()
     self.write_metadata_by_name(self._name, 'pid', str(pid))
 
   def write_socket(self, socket_info):
@@ -312,6 +326,10 @@ class ProcessManager(ProcessMetadataManager):
   def write_named_socket(self, socket_name, socket_info):
     """A multi-tenant, named alternative to ProcessManager.write_socket()."""
     self.write_metadata_by_name(self._name, 'socket_{}'.format(socket_name), str(socket_info))
+
+  def read_named_socket(self, socket_name, socket_type):
+    """A multi-tenant, named alternative to ProcessManager.socket."""
+    return self.read_metadata_by_name(self._name, 'socket_{}'.format(socket_name), socket_type)
 
   def _as_process(self):
     """Returns a psutil `Process` object wrapping our pid.
@@ -433,16 +451,16 @@ class ProcessManager(ProcessMetadataManager):
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
       else:
         try:
           if write_pid: self.write_pid(second_pid)
           self.post_fork_parent(**post_fork_parent_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
     else:
       # This prevents un-reaped, throw-away parent processes from lingering in the process table.
       os.waitpid(pid, 0)
@@ -465,8 +483,8 @@ class ProcessManager(ProcessMetadataManager):
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logger.critical(traceback.format_exc())
-
-      os._exit(0)
+      finally:
+        os._exit(0)
     else:
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
@@ -475,12 +493,9 @@ class ProcessManager(ProcessMetadataManager):
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""
-    pass
 
   def post_fork_child(self):
     """Pre-fork child callback for subclasses."""
-    pass
 
   def post_fork_parent(self):
     """Post-fork parent callback for subclasses."""
-    pass

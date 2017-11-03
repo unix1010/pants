@@ -12,13 +12,13 @@ import sys
 import sysconfig
 import threading
 import traceback
+from contextlib import closing
 
 import cffi
+import pkg_resources
 import six
 
-from pants.binaries.binary_util import BinaryUtil
-from pants.engine.storage import Storage
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, touch
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
@@ -147,7 +147,7 @@ void externs_set(ExternContext*,
                  extern_ptr_invoke_runnable,
                  TypeId);
 
-Tasks* tasks_create();
+Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
@@ -203,7 +203,7 @@ void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 
 void nodes_destroy(RawNodes*);
 
-void set_panic_handler();
+void set_panic_handler(void);
 '''
 
 CFFI_EXTERNS = '''
@@ -243,7 +243,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
 
   output_prefix = os.path.join(output_dir, module_name)
   c_file = '{}.c'.format(output_prefix)
-  env_script = '{}.sh'.format(output_prefix)
+  env_script = '{}.cflags'.format(output_prefix)
 
   ffibuilder = cffi.FFI()
   ffibuilder.cdef(CFFI_TYPEDEFS)
@@ -255,7 +255,18 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   # Write a shell script to be sourced at build time that contains inherited CFLAGS.
   print('generating {}'.format(env_script))
   with open(env_script, 'wb') as f:
-    f.write(b'export CFLAGS="{}"\n'.format(get_build_cflags()))
+    f.write(get_build_cflags())
+
+  # These files are built by Cargo which looks at mtime to determine when to rebuild. Since
+  # this source file contains the generated contents this is a simple way to make sure we don't
+  # trigger Cargo rebuilds un-necessarily.
+  source_mtime = os.stat(__file__).st_mtime
+
+  def fixup_times(path):
+    touch(path, times=(source_mtime, source_mtime))
+
+  fixup_times(c_file)
+  fixup_times(env_script)
 
 
 def _initialize_externs(ffi):
@@ -446,28 +457,25 @@ class ObjectIdMap(object):
   """
 
   def __init__(self):
-    # Objects indexed by their keys, i.e, content digests
-    self._objects = Storage.create()
     # Memoized object Ids.
-    self._id_to_key = dict()
-    self._key_to_id = dict()
+    self._id_to_obj = dict()
+    self._obj_to_id = dict()
     self._next_id = 0
 
   def put(self, obj):
-    key = self._objects.put(obj)
     new_id = self._next_id
-    oid = self._key_to_id.setdefault(key, new_id)
+    oid = self._obj_to_id.setdefault(obj, new_id)
     if oid is not new_id:
       # Object already existed.
       return oid
 
     # Object is new/unique.
-    self._id_to_key[oid] = key
+    self._id_to_obj[oid] = obj
     self._next_id += 1
     return oid
 
   def get(self, oid):
-    return self._objects.get(self._id_to_key[oid])
+    return self._id_to_obj[oid]
 
 
 class ExternContext(object):
@@ -508,9 +516,9 @@ class ExternContext(object):
     buf_buf = self._ffi.new('Buffer[]', bufs)
     return (buf_buf, len(bufs), self.to_value(buf_buf))
 
-  def vals_buf(self, keys):
-    buf = self._ffi.new('Value[]', keys)
-    return (buf, len(keys), self.to_value(buf))
+  def vals_buf(self, vals):
+    buf = self._ffi.new('Value[]', vals)
+    return (buf, len(vals), self.to_value(buf))
 
   def type_ids_buf(self, types):
     buf = self._ffi.new('TypeId[]', types)
@@ -553,24 +561,14 @@ class Native(object):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
   @staticmethod
-  def create(options):
+  def create(bootstrap_options):
     """:param options: Any object that provides access to bootstrap option values."""
-    binary_util = BinaryUtil.Factory.create()
-    return Native(binary_util,
-                  options.native_engine_version,
-                  options.native_engine_supportdir,
-                  options.native_engine_visualize_to)
+    return Native(bootstrap_options.native_engine_visualize_to)
 
-  def __init__(self, binary_util, version, supportdir, visualize_to_dir):
+  def __init__(self, visualize_to_dir):
     """
-    :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
-    :param version: The binary version of the native engine.
-    :param supportdir: The supportdir for the native engine.
     :param visualize_to_dir: An existing directory (or None) to visualize executions to.
     """
-    self._binary_util = binary_util
-    self._version = version
-    self._supportdir = supportdir
     self._visualize_to_dir = visualize_to_dir
 
   @property
@@ -580,9 +578,12 @@ class Native(object):
   @memoized_property
   def binary(self):
     """Load and return the path to the native engine binary."""
-    return self._binary_util.select_binary(self._supportdir,
-                                           self._version,
-                                           '{}.so'.format(NATIVE_ENGINE_MODULE))
+    lib_name = '{}.so'.format(NATIVE_ENGINE_MODULE)
+    lib_path = os.path.join(safe_mkdtemp(), lib_name)
+    with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
+      with open(lib_path, 'wb') as output_fp:
+        output_fp.write(input_fp.read())
+    return lib_path
 
   @memoized_property
   def lib(self):

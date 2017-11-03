@@ -46,6 +46,8 @@ python_tests(
   name='incomplete_custom_scala',
   sources=['test_incomplete_custom_scala.py'],
   dependencies=[
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

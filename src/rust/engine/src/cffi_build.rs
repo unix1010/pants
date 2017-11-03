@@ -1,4 +1,4 @@
-extern crate gcc;
+extern crate cc;
 
 /*
 
@@ -18,10 +18,50 @@ native engine binary, allowing us to address it both as an importable python mod
 
 */
 
+use std::fs;
+use std::io::{Read, Result};
+use std::path::{Path, PathBuf};
+
 fn main() {
-  gcc::Config::new()
-    // N.B. The filename of this source code - at generation time - must line up 1:1 with the
-    // python import name, as python keys the initialization function name off of the import name.
-    .file("src/cffi/native_engine.c")
-    .compile("libnative_engine_ffi.a");
+  let mut config = cc::Build::new();
+
+  // Don't implicitly set -Wall -Wextra because cffi generates code with warnings.
+  // TODO: Consider removing this if/when https://github.com/alexcrichton/cc-rs/pull/248 lands.
+  config.warnings(false);
+
+  // N.B. The filename of this source code - at generation time - must line up 1:1 with the
+  // python import name, as python keys the initialization function name off of the import name.
+  let cffi_dir = Path::new("src/cffi");
+  let c_path = mark_for_change_detection(cffi_dir.join("native_engine.c"));
+  let env_script_path = mark_for_change_detection(cffi_dir.join("native_engine.cflags"));
+
+  config.file(c_path.to_str().unwrap());
+  for flag in make_flags(&env_script_path).unwrap() {
+    config.flag(flag.as_str());
+  }
+
+  config.compile("libnative_engine_ffi.a");
+}
+
+fn mark_for_change_detection(path: PathBuf) -> PathBuf {
+  // Restrict re-compilation check to just our input files.
+  // See: http://doc.crates.io/build-script.html#outputs-of-the-build-script
+  println!("cargo:rerun-if-changed={}", path.to_str().unwrap());
+  path
+}
+
+fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
+  let mut contents = String::new();
+  fs::File::open(env_script_path)?.read_to_string(
+    &mut contents,
+  )?;
+  // It would be a shame if someone were to include a space in an actual quoted value.
+  // If they did that, I guess we'd need to implement shell tokenization or something.
+  return Ok(
+    contents
+      .trim()
+      .split_whitespace()
+      .map(str::to_owned)
+      .collect(),
+  );
 }

@@ -34,7 +34,7 @@ class PythonSetup(Subsystem):
     register('--interpreter-constraints', advanced=True, default=[], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
-                  "e.g. 'CPython>=2.6,<3' or 'PyPy'. Multiple constraints will be ORed together. "
+                  "e.g. 'CPython>=2.7,<3' or 'PyPy'. Multiple constraints will be ORed together. "
                   "These constraints are applied in addition to any compatibilities required by "
                   "the relevant targets.")
     register('--setuptools-version', advanced=True, default='30.0.0',
@@ -62,11 +62,17 @@ class PythonSetup(Subsystem):
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
+    register('--interpreter-search-paths', advanced=True, type=list, default=[], metavar='<binary-paths>',
+             help='A list of paths to search for python interpreters.')
 
   @property
   def interpreter_constraints(self):
     return (self.get_options().interpreter_constraints or self.get_options().interpreter or
             [self.get_options().interpreter_requirement or b''])
+
+  @property
+  def interpreter_search_paths(self):
+    return self.get_options().interpreter_search_paths
 
   @property
   def setuptools_version(self):

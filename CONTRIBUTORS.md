@@ -20,6 +20,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Chris Chen
 + Chris Heisterkamp
 + Chris Pesto
++ Christopher Livingston
 + Cody Gibb
 + Craig Schertz
 + Dan Davydov
@@ -27,7 +28,10 @@ Created by running `./build-support/bin/contributors.sh`.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Peebles
++ Daniel Wagner-Hall
 + Dave Brewster
++ David Katz
 + David Taylor
 + David Turner
 + Derek Young
@@ -37,6 +41,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Drew Rothstein
 + Dumitru Daniliuc
 + Ebube Chuba
++ Eitan Adler
 + Emily Caveness
 + Eric Ayers
 + Eric Danielson

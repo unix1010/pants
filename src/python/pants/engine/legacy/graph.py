@@ -33,6 +33,16 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
+def target_types_from_symbol_table(symbol_table):
+  """Given a LegacySymbolTable, return the concrete target types constructed for each alias."""
+  aliases = symbol_table.aliases()
+  target_types = dict(aliases.target_types)
+  for alias, factory in aliases.target_macro_factories.items():
+    target_type, = factory.target_types
+    target_types[alias] = target_type
+  return target_types
+
+
 class _DestWrapper(datatype('DestWrapper', ['target_types'])):
   """A wrapper for dest field of RemoteSources target.
 
@@ -50,15 +60,15 @@ class LegacyBuildGraph(BuildGraph):
     """Raised when command line spec is not a valid directory"""
 
   @classmethod
-  def create(cls, scheduler, symbol_table_cls):
+  def create(cls, scheduler, symbol_table):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, cls._get_target_types(symbol_table_cls))
+    return cls(scheduler, target_types_from_symbol_table(symbol_table))
 
   def __init__(self, scheduler, target_types):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
     :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
-    :param symbol_table_cls: A SymbolTable class used to instantiate Target objects. Must match
+    :param symbol_table: A SymbolTable instance used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
     self._scheduler = scheduler
@@ -68,15 +78,6 @@ class LegacyBuildGraph(BuildGraph):
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
     return LegacyBuildGraph(self._scheduler, self._target_types)
-
-  @staticmethod
-  def _get_target_types(symbol_table_cls):
-    aliases = symbol_table_cls.aliases()
-    target_types = dict(aliases.target_types)
-    for alias, factory in aliases.target_macro_factories.items():
-      target_type, = factory.target_types
-      target_types[alias] = target_type
-    return target_types
 
   def _index(self, roots):
     """Index from the given roots into the storage provided by the base class.
@@ -240,7 +241,7 @@ class LegacyBuildGraph(BuildGraph):
                                                          subjects)
     except ResolveError as e:
       # NB: ResolveError means that a target was not found, which is a common user facing error.
-      raise AddressLookupError(str(e.exc))
+      raise AddressLookupError(str(e))
     except Exception as e:
       raise AddressLookupError(
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
@@ -356,9 +357,9 @@ def hydrate_bundles(bundles_field, snapshot_list):
   return HydratedField('bundles', bundles)
 
 
-def create_legacy_graph_tasks(symbol_table_cls):
+def create_legacy_graph_tasks(symbol_table):
   """Create tasks to recursively parse the legacy graph."""
-  symbol_table_constraint = symbol_table_cls.constraint()
+  symbol_table_constraint = symbol_table.constraint()
   return [
     transitive_hydrated_targets,
     TaskRule(

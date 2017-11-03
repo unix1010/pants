@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
+from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from twitter.common.collections import OrderedSet
 
@@ -41,7 +42,9 @@ class ScroogeGenTest(NailgunTaskTestBase):
     self.set_options_for_scope('thrift-defaults',
                                compiler='unchecked',
                                language='uniform',
-                               rpc_style='async')
+                               rpc_style='async',
+                               service_deps='service_deps',
+                               structs_deps='structs_deps')
 
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',
@@ -147,8 +150,6 @@ class ScroogeGenTest(NailgunTaskTestBase):
     context = self.context(target_roots=[target])
     task = self.prepare_execute(context)
 
-    task._declares_service = lambda source: False
-
     task.gen = MagicMock()
     task.gen.return_value = {'test_smoke/a.thrift': sources}
 
@@ -163,10 +164,48 @@ class ScroogeGenTest(NailgunTaskTestBase):
       self.assertEquals(call_kwargs['target_type'], library_type)
       self.assertEquals(call_kwargs['dependencies'], OrderedSet())
       self.assertEquals(call_kwargs['provides'], None)
-      self.assertEquals(call_kwargs['sources'], [])
       self.assertEquals(call_kwargs['derived_from'], target)
       self.assertEquals(call_kwargs['strict_deps'], True)
       self.assertEquals(call_kwargs['fatal_warnings'], False)
 
+      sources = call_kwargs['sources']
+      if isinstance(sources, EagerFilesetWithSpec):
+        self.assertEquals(sources.files, [])
+      else:
+        self.assertEquals(sources, [])
+
     finally:
       Context.add_new_target = saved_add_new_target
+
+  def test_basic_deps(self):
+    contents = dedent('''#@namespace android org.pantsbuild.android_example
+      namespace java org.pantsbuild.example
+      struct Example {
+      1: optional i64 number
+      }
+    ''')
+    self._test_dependencies_help(contents, False, False)
+
+  def test_service_deps(self):
+    contents = dedent('''#@namespace android org.pantsbuild.android_example
+      namespace java org.pantsbuild.example
+      service MultiplicationService
+      {
+        int multiply(1:int n1, 2:int n2),
+      }''')
+    self._test_dependencies_help(contents, True, False)
+
+  def test_exception_deps(self):
+    contents = dedent('''#@namespace android org.pantsbuild.android_example
+      namespace java org.pantsbuild.example
+      exception InvalidOperation {
+        1: i32 what,
+        2: string why
+      }''')
+    self._test_dependencies_help(contents, False, True)
+
+  def _test_dependencies_help(self, contents, declares_service, declares_exception):
+    source = 'test_smoke/a.thrift'
+    self.create_file(relpath=source, contents=contents)
+    self.assertEquals(ScroogeGen._declares_service(source), declares_service)
+    self.assertEquals(ScroogeGen._declares_exception(source), declares_exception)

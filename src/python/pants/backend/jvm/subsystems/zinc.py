@@ -173,7 +173,7 @@ class Zinc(Subsystem, JvmToolMixin):
     classpath_product = products.get_data(classpath_product_key)
 
     if DependencyContext.global_instance().defaulted_property(target, lambda x: x.strict_deps):
-      dependencies = DependencyContext.global_instance().strict_dependencies(target)
+      dependencies = target.strict_dependencies(DependencyContext.global_instance())
     else:
       dependencies = DependencyContext.global_instance().all_dependencies(target)
 
@@ -182,7 +182,12 @@ class Zinc(Subsystem, JvmToolMixin):
     if extra_cp_entries:
       all_extra_cp_entries.extend(extra_cp_entries)
 
-    return ClasspathUtil.compute_classpath(dependencies,
+    # TODO: We convert dependencies to an iterator here in order to _preserve_ a bug that will be
+    # fixed in https://github.com/pantsbuild/pants/issues/4874: `ClasspathUtil.compute_classpath`
+    # expects to receive a list, but had been receiving an iterator. In the context of an
+    # iterator, `excludes` are not applied
+    # in ClasspathProducts.get_product_target_mappings_for_targets.
+    return ClasspathUtil.compute_classpath(iter(dependencies),
                                            classpath_product,
                                            all_extra_cp_entries,
                                            cls.DEFAULT_CONFS)
