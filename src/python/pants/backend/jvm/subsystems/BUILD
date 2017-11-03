@@ -8,7 +8,6 @@ python_library(
     ':java',
     ':scala_platform',
     'src/python/pants/backend/codegen/thrift/java',
-    'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
