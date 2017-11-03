@@ -69,8 +69,8 @@ class Zinc(Subsystem, JvmToolMixin):
                                'explicit dependencies.',
                           **kwargs)
 
-    def sbt_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-RC3', **kwargs)
+    def zinc_jar(name, **kwargs):
+      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.3', **kwargs)
 
     shader_rules = [
         # The compiler-interface and compiler-bridge tool jars carry xsbt and
@@ -85,14 +85,14 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'stuhood-zinc-classloader-cache-6'),
+                            JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.3'),
                           ],
                           **kwargs)
 
     cls.register_jvm_tool(register,
                           'compiler-bridge',
                           classpath=[
-                            sbt_jar(name='compiler-bridge_2.11',
+                            zinc_jar(name='compiler-bridge_2.11',
                                     classifier='sources',
                                     intransitive=True)
                           ],
@@ -100,7 +100,7 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'compiler-interface',
                           classpath=[
-                            sbt_jar(name='compiler-interface')
+                            zinc_jar(name='compiler-interface')
                           ],
                           # NB: We force a noop-jarjar'ing of the interface, since it is now broken
                           # up into multiple jars, but zinc does not yet support a sequence of jars
@@ -112,7 +112,7 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.1')
+                            JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.3')
                           ])
 
   def __init__(self, *args, **kwargs):
