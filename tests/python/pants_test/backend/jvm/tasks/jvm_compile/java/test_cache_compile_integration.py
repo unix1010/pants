@@ -203,8 +203,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         self.assertTrue(
             re.search(
               "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
-              run_two.stdout_data_no_escapes),
-            run_two.stdout_data_no_escapes)
+              run_two.stdout_data),
+            run_two.stdout_data)
 
         # 3) Edit the dependency in a way that should trigger an incremental
         #    compile of the consumer.
@@ -216,8 +216,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         self.assertTrue(
             re.search(
               r"/org/pantsbuild/consumer:consumer\)[^[]*\[compile\][^[]*\[zinc\]\W*\[info\] Compile success",
-              run_three.stdout_data_no_escapes),
-            run_three.stdout_data_no_escapes)
+              run_three.stdout_data),
+            run_three.stdout_data)
 
   def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""

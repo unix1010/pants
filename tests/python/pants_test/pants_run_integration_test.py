@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ConfigParser
 import os
-import re
 import shutil
 import unittest
 from collections import namedtuple
@@ -27,19 +26,10 @@ from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
-# Match ANSI escape codes.
-_ANSI_ESCAPES = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
+PantsResult = namedtuple(
+  'PantsResult',
+  ['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])
 
-
-class PantsResult(namedtuple('PantsResult',
-                             ['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])):
-  @property
-  def stdout_data_no_escapes(self):
-    return _ANSI_ESCAPES.sub('', self.stdout_data)
-
-  @property
-  def stderr_data_no_escapes(self):
-    return _ANSI_ESCAPES.sub('', self.stderr_data)
 
 def ensure_cached(expected_num_artifacts=None):
   """Decorator for asserting cache writes in an integration test.
@@ -343,9 +333,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return '\n\t'.join(content.splitlines())
 
     if pants_run.stdout_data:
-      details.append('stdout:\n\t{stdout}'.format(stdout=indent(pants_run.stdout_data_no_escapes)))
+      details.append('stdout:\n\t{stdout}'.format(stdout=indent(pants_run.stdout_data)))
     if pants_run.stderr_data:
-      details.append('stderr:\n\t{stderr}'.format(stderr=indent(pants_run.stderr_data_no_escapes)))
+      details.append('stderr:\n\t{stderr}'.format(stderr=indent(pants_run.stderr_data)))
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
