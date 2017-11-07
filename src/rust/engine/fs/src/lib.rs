@@ -22,9 +22,12 @@ extern crate tar;
 extern crate tempdir;
 
 use std::collections::HashSet;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, RwLock, RwLockReadGuard};
-use std::{fmt, fs, io};
+use std::{fmt, fs};
+use std::io::{self, Read};
+use std::cmp::min;
 
 use futures::future::{self, Future};
 use futures_cpupool::{CpuFuture, CpuPool};
@@ -48,7 +51,7 @@ impl Stat {
   pub fn path(&self) -> &Path {
     match self {
       &Stat::Dir(Dir(ref p)) => p.as_path(),
-      &Stat::File(File(ref p)) => p.as_path(),
+      &Stat::File(File { path: ref p, .. }) => p.as_path(),
       &Stat::Link(Link(ref p)) => p.as_path(),
     }
   }
@@ -61,7 +64,10 @@ pub struct Link(pub PathBuf);
 pub struct Dir(pub PathBuf);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct File(pub PathBuf);
+pub struct File {
+  pub path: PathBuf,
+  pub is_executable: bool,
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathStat {
@@ -310,16 +316,20 @@ struct PathGlobsExpansion<T: Sized> {
   outputs: OrderMap<PathStat, ()>,
 }
 
+///
+/// All Stats consumed or return by this type are relative to the root.
+///
 pub struct PosixFS {
-  build_root: Dir,
+  root: Dir,
   // The pool needs to be reinitialized after a fork, so it is protected by a lock.
   pool: RwLock<Option<CpuPool>>,
   ignore: Gitignore,
 }
 
 impl PosixFS {
-  pub fn new(build_root: &Path, ignore_patterns: Vec<String>) -> Result<PosixFS, String> {
-    let canonical_build_root = build_root
+  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: Vec<String>) -> Result<PosixFS, String> {
+    let root: &Path = root.as_ref();
+    let canonical_root = root
       .canonicalize()
       .and_then(|canonical| {
         canonical.metadata().and_then(
@@ -334,14 +344,10 @@ impl PosixFS {
         )
       })
       .map_err(|e| {
-        format!(
-          "Could not canonicalize build root {:?}: {:?}",
-          build_root,
-          e
-        )
+        format!("Could not canonicalize root {:?}: {:?}", root, e)
       })?;
 
-    let ignore = PosixFS::create_ignore(&canonical_build_root, &ignore_patterns)
+    let ignore = PosixFS::create_ignore(&canonical_root, &ignore_patterns)
       .map_err(|e| {
         format!(
           "Could not parse build ignore inputs {:?}: {:?}",
@@ -350,7 +356,7 @@ impl PosixFS {
         )
       })?;
     Ok(PosixFS {
-      build_root: canonical_build_root,
+      root: canonical_root,
       pool: RwLock::new(None),
       ignore: ignore,
     })
@@ -368,21 +374,21 @@ impl PosixFS {
     ignore_builder.build()
   }
 
-  pub fn scandir_sync(dir: Dir, dir_abs: &Path) -> Result<Vec<Stat>, io::Error> {
-    let mut stats = Vec::new();
-    for dir_entry_res in dir_abs.read_dir()? {
-      let dir_entry = dir_entry_res?;
-      let path = dir.0.join(dir_entry.file_name());
-      let file_type = dir_entry.file_type()?;
-      if file_type.is_dir() {
-        stats.push(Stat::Dir(Dir(path)));
-      } else if file_type.is_file() {
-        stats.push(Stat::File(File(path)));
-      } else if file_type.is_symlink() {
-        stats.push(Stat::Link(Link(path)));
-      }
-      // Else: ignore.
-    }
+  fn scandir_sync(root: PathBuf, dir_relative_to_root: Dir) -> Result<Vec<Stat>, io::Error> {
+    let dir_abs = root.join(&dir_relative_to_root.0);
+    let mut stats: Vec<Stat> = dir_abs
+      .read_dir()?
+      .map(|readdir| {
+        let dir_entry = readdir?;
+        let get_metadata = || std::fs::metadata(dir_abs.join(dir_entry.file_name()));
+        PosixFS::stat_internal(
+          dir_relative_to_root.0.join(dir_entry.file_name()),
+          dir_entry.file_type()?,
+          &dir_abs,
+          get_metadata,
+        )
+      })
+      .collect::<Result<Vec<_>, io::Error>>()?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
   }
@@ -417,9 +423,26 @@ impl PosixFS {
     }
   }
 
+  pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
+    let path = file.path.clone();
+    let path_abs = self.root.0.join(&file.path);
+    self
+      .pool()
+      .as_ref()
+      .expect("Uninitialized CpuPool!")
+      .spawn_fn(move || {
+        std::fs::File::open(&path_abs).and_then(|mut f| {
+          let mut content = Vec::new();
+          f.read_to_end(&mut content)?;
+          Ok(FileContent { path, content })
+        })
+      })
+      .to_boxed()
+  }
+
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
-    let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
+    let link_abs = self.root.0.join(link.0.as_path()).to_owned();
     let pool = self.pool();
     pool
       .as_ref()
@@ -446,14 +469,78 @@ impl PosixFS {
       .to_boxed()
   }
 
+  ///
+  /// Makes a Stat for path_for_stat relative to absolute_path_to_root.
+  ///
+  fn stat_internal<F>(
+    path_for_stat: PathBuf,
+    file_type: std::fs::FileType,
+    absolute_path_to_root: &Path,
+    get_metadata: F,
+  ) -> Result<Stat, io::Error>
+  where
+    F: FnOnce() -> Result<fs::Metadata, io::Error>,
+  {
+    if !path_for_stat.is_relative() {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!(
+          "Argument path_for_stat to PosixFS::stat must be relative path, got {:?}",
+          path_for_stat
+        ),
+      ));
+    }
+    // TODO: Make this an instance method, and stop having to check this every call.
+    if !absolute_path_to_root.is_absolute() {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!(
+          "Argument absolute_path_to_root to PosixFS::stat must be absolute path, got {:?}",
+          absolute_path_to_root
+        ),
+      ));
+    }
+    if file_type.is_dir() {
+      Ok(Stat::Dir(Dir(path_for_stat)))
+    } else if file_type.is_file() {
+      let is_executable = get_metadata()?.permissions().mode() & 0o100 == 0o100;
+      Ok(Stat::File(File {
+        path: path_for_stat,
+        is_executable: is_executable,
+      }))
+    } else if file_type.is_symlink() {
+      Ok(Stat::Link(Link(path_for_stat)))
+    } else {
+      Err(io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!(
+          "Expected File, Dir or Link, but {:?} (relative to {:?}) was a {:?}",
+          path_for_stat,
+          absolute_path_to_root,
+          file_type
+        ),
+      ))
+    }
+  }
+
+  pub fn stat(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
+    let metadata = fs::symlink_metadata(self.root.0.join(&relative_path))?;
+    PosixFS::stat_internal(
+      relative_path,
+      metadata.file_type(),
+      &self.root.0,
+      || Ok(metadata),
+    )
+  }
+
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
     let dir = dir.to_owned();
-    let dir_abs = self.build_root.0.join(dir.0.as_path());
+    let root = self.root.0.clone();
     let pool = self.pool();
     pool
       .as_ref()
       .expect("Uninitialized CpuPool!")
-      .spawn_fn(move || PosixFS::scandir_sync(dir, &dir_abs))
+      .spawn_fn(move || PosixFS::scandir_sync(root, dir))
       .to_boxed()
   }
 }
@@ -552,7 +639,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                   future::ok(res).to_boxed()
                 }
                 Stat::File(f) => {
-                  let res = if context.ignore(f.0.as_path(), false) {
+                  let res = if context.ignore(f.path.as_path(), false) {
                     None
                   } else {
                     Some(PathStat::file(stat_symbolic_path.to_owned(), f))
@@ -688,6 +775,25 @@ pub struct FileContent {
   pub content: Vec<u8>,
 }
 
+impl fmt::Debug for FileContent {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let len = min(self.content.len(), 5);
+    let describer = if len < self.content.len() {
+      "starting "
+    } else {
+      ""
+    };
+    write!(
+      f,
+      "FileContent(path={:?}, content={} bytes {}{:?})",
+      self.path,
+      self.content.len(),
+      describer,
+      &self.content[..len]
+    )
+  }
+}
+
 #[derive(Clone)]
 pub struct Snapshot {
   pub fingerprint: Fingerprint,
@@ -820,7 +926,7 @@ impl Snapshots {
       let append_res = match path_stat {
         &PathStat::File { ref path, ref stat } => {
           let normalized = Snapshots::normalize(path)?;
-          let mut input = fs::File::open(relative_to.0.join(stat.0.as_path()))
+          let mut input = fs::File::open(relative_to.0.join(stat.path.as_path()))
             .map_err(|e| format!("Failed to open {:?}: {:?}", path_stat, e))?;
           tar_builder.append_file(normalized, &mut input)
         }
@@ -907,7 +1013,7 @@ impl Snapshots {
   ///
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
     let dest_dir = self.snapshot_path().to_owned();
-    let build_root = fs.build_root.clone();
+    let root = fs.root.clone();
     let temp_path = self.next_temp_path().expect(
       "Couldn't get the next temp path.",
     );
@@ -916,8 +1022,7 @@ impl Snapshots {
     pool.as_ref().expect("Uninitialized CpuPool!").spawn_fn(
       move || {
         // Write the tar deterministically to a temporary file while fingerprinting.
-        let fingerprint =
-          Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
+        let fingerprint = Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &root)?;
 
         // Rename to the final path if it does not already exist.
         Snapshots::finalize(
@@ -971,5 +1076,225 @@ impl Snapshots {
         })
       },
     )
+  }
+}
+
+#[cfg(test)]
+mod posixfs_test {
+  extern crate tempdir;
+
+  use super::{Dir, File, Link, PosixFS, Stat};
+  use futures::Future;
+  use std;
+  use std::io::Write;
+  use std::os::unix::fs::PermissionsExt;
+  use std::path::{Path, PathBuf};
+
+  #[test]
+  fn is_executable_false() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    make_file(&dir.path().join("marmosets"), &[], 0o611);
+    assert_only_file_is_executable(dir.path(), false);
+  }
+
+  #[test]
+  fn is_executable_true() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    make_file(&dir.path().join("photograph_marmosets"), &[], 0o700);
+    assert_only_file_is_executable(dir.path(), true);
+  }
+
+  #[test]
+  fn read_file() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let path = PathBuf::from("marmosets");
+    let content = "cute".as_bytes().to_vec();
+    make_file(
+      &std::fs::canonicalize(dir.path()).unwrap().join(&path),
+      &content,
+      0o600,
+    );
+    let fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let file_content = fs.read_file(&File {
+      path: path.clone(),
+      is_executable: false,
+    }).wait()
+      .unwrap();
+    assert_eq!(file_content.path, path);
+    assert_eq!(file_content.content, content);
+  }
+
+  #[test]
+  fn read_file_missing() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    PosixFS::new(&dir.path(), vec![])
+      .unwrap()
+      .read_file(&File {
+        path: PathBuf::from("marmosets"),
+        is_executable: false,
+      })
+      .wait()
+      .expect_err("Expected error");
+  }
+
+  #[test]
+  fn stat_executable_file() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let path = PathBuf::from("photograph_marmosets");
+    make_file(&dir.path().join(&path), &[], 0o700);
+    assert_eq!(
+      posix_fs.stat(path.clone()).unwrap(),
+      super::Stat::File(File {
+        path: path,
+        is_executable: true,
+      })
+    )
+  }
+
+  #[test]
+  fn stat_nonexecutable_file() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let path = PathBuf::from("marmosets");
+    make_file(&dir.path().join(&path), &[], 0o600);
+    assert_eq!(
+      posix_fs.stat(path.clone()).unwrap(),
+      super::Stat::File(File {
+        path: path,
+        is_executable: false,
+      })
+    )
+  }
+
+  #[test]
+  fn stat_dir() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let path = PathBuf::from("enclosure");
+    std::fs::create_dir(dir.path().join(&path)).unwrap();
+    assert_eq!(
+      posix_fs.stat(path.clone()).unwrap(),
+      super::Stat::Dir(Dir(path))
+    )
+  }
+
+  #[test]
+  fn stat_symlink() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let path = PathBuf::from("marmosets");
+    make_file(&dir.path().join(&path), &[], 0o600);
+
+    let link_path = PathBuf::from("remarkably_similar_marmoset");
+    std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
+    assert_eq!(
+      posix_fs.stat(link_path.clone()).unwrap(),
+      super::Stat::Link(Link(link_path))
+    )
+  }
+
+  #[test]
+  fn stat_other() {
+    let posix_fs = PosixFS::new("/dev", vec![]).unwrap();
+    posix_fs.stat(PathBuf::from("null")).expect_err(
+      "Want error",
+    );
+  }
+
+  #[test]
+  fn stat_missing() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    posix_fs.stat(PathBuf::from("no_marmosets")).expect_err(
+      "Want error",
+    );
+  }
+
+  #[test]
+  fn scandir_empty() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let path = PathBuf::from("empty_enclosure");
+    std::fs::create_dir(dir.path().join(&path)).unwrap();
+    assert_eq!(posix_fs.scandir(&Dir(path)).wait().unwrap(), vec![]);
+  }
+
+  #[test]
+  fn scandir() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let path = PathBuf::from("enclosure");
+    std::fs::create_dir(dir.path().join(&path)).unwrap();
+
+    let a_marmoset = path.join("a_marmoset");
+    let feed = path.join("feed");
+    let hammock = path.join("hammock");
+    let remarkably_similar_marmoset = path.join("remarkably_similar_marmoset");
+    let sneaky_marmoset = path.join("sneaky_marmoset");
+
+    make_file(&dir.path().join(&feed), &[], 0o700);
+    make_file(&dir.path().join(&a_marmoset), &[], 0o600);
+    make_file(&dir.path().join(&sneaky_marmoset), &[], 0o600);
+    std::os::unix::fs::symlink(
+      &dir.path().join(&a_marmoset),
+      dir.path().join(
+        &dir.path().join(&remarkably_similar_marmoset),
+      ),
+    ).unwrap();
+    std::fs::create_dir(dir.path().join(&hammock)).unwrap();
+    make_file(
+      &dir.path().join(&hammock).join("napping_marmoset"),
+      &[],
+      0o600,
+    );
+
+    assert_eq!(
+      posix_fs.scandir(&Dir(path)).wait().unwrap(),
+      vec![
+        Stat::File(File {
+          path: a_marmoset,
+          is_executable: false,
+        }),
+        Stat::File(File {
+          path: feed,
+          is_executable: true,
+        }),
+        Stat::Dir(Dir(hammock)),
+        Stat::Link(Link(remarkably_similar_marmoset)),
+        Stat::File(File {
+          path: sneaky_marmoset,
+          is_executable: false,
+        }),
+      ]
+    );
+  }
+
+  #[test]
+  fn scandir_missing() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    posix_fs
+      .scandir(&Dir(PathBuf::from("no_marmosets_here")))
+      .wait()
+      .expect_err("Want error");
+  }
+
+  fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
+    let fs = PosixFS::new(path, vec![]).unwrap();
+    let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
+    assert_eq!(stats.len(), 1);
+    match stats.get(0).unwrap() {
+      &super::Stat::File(File { is_executable: got, .. }) => assert_eq!(want_is_executable, got),
+      other => panic!("Expected file, got {:?}", other),
+    }
+  }
+
+  fn make_file(path: &Path, contents: &[u8], mode: u32) {
+    let mut file = std::fs::File::create(&path).unwrap();
+    file.write(contents).unwrap();
+    let mut permissions = std::fs::metadata(path).unwrap().permissions();
+    permissions.set_mode(mode);
+    file.set_permissions(permissions).unwrap();
   }
 }
