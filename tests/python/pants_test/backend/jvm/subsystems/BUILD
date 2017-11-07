@@ -30,19 +30,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'dependency_context',
-  sources = ['test_dependency_context.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/backend/jvm/subsystems:dependency_context',
-    'src/python/pants/backend/jvm/targets:java',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:base_test',
-  ],
-  timeout=30,
-)
-
-python_tests(
   name='incomplete_custom_scala',
   sources=['test_incomplete_custom_scala.py'],
   dependencies=[

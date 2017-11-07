@@ -114,10 +114,13 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
 
   def test_working_custom_212(self):
-    custom_buildfile = os.path.join(self.target_path, 'custom_212_scalatools.build')
-    with self.tmp_buildfile(custom_buildfile):
+    with self.tmp_custom_scala('custom_212_scalatools.build') as scalastyle_config_option:
       pants_run = self.pants_run(
-        options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.12']
+        options=[
+          '--scala-platform-version=custom',
+          '--scala-platform-suffix-version=2.12',
+          scalastyle_config_option,
+        ]
       )
       self.assert_success(pants_run)
       assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
