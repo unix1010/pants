@@ -1,1 +1,3 @@
-java_library()
+java_library(
+  platform='java8',
+)
