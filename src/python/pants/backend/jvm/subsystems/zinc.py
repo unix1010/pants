@@ -71,8 +71,6 @@ class Zinc(Subsystem, JvmToolMixin):
                           **kwargs)
 
     zinc_rev = '1.0.3'
-    def zinc_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev=zinc_rev, **kwargs)
 
     shader_rules = [
         # The compiler-interface and compiler-bridge tool jars carry xsbt and
