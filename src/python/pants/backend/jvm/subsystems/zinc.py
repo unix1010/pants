@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
 from pants.java.jar.jar_dependency import JarDependency
@@ -69,8 +70,9 @@ class Zinc(Subsystem, JvmToolMixin):
                                'explicit dependencies.',
                           **kwargs)
 
+    zinc_rev = '1.0.3'
     def zinc_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.3', **kwargs)
+      return JarDependency(org='org.scala-sbt', name=name, rev=zinc_rev, **kwargs)
 
     shader_rules = [
         # The compiler-interface and compiler-bridge tool jars carry xsbt and
@@ -92,15 +94,17 @@ class Zinc(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register,
                           'compiler-bridge',
                           classpath=[
-                            zinc_jar(name='compiler-bridge_2.11',
-                                    classifier='sources',
-                                    intransitive=True)
+                            ScalaJarDependency(org='org.scala-sbt',
+                                               name='compiler-bridge',
+                                               rev=zinc_rev,
+                                               classifier='sources',
+                                               intransitive=True),
                           ],
                           **kwargs)
     cls.register_jvm_tool(register,
                           'compiler-interface',
                           classpath=[
-                            zinc_jar(name='compiler-interface')
+                            JarDependency(org='org.scala-sbt', name='compiler-interface', rev=zinc_rev),
                           ],
                           # NB: We force a noop-jarjar'ing of the interface, since it is now broken
                           # up into multiple jars, but zinc does not yet support a sequence of jars
