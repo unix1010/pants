@@ -6,6 +6,7 @@ use std::error::Error;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use futures::future::{self, Future};
 use ordermap::OrderMap;
@@ -51,7 +52,7 @@ fn was_required(failure: Failure) -> Failure {
   }
 }
 
-trait GetNode {
+pub trait GetNode {
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
 }
 
@@ -289,13 +290,12 @@ impl Select {
       vec![
         self
           .get_snapshot(&context)
-          .and_then(move |snapshot|
+          .and_then(
+            move |snapshot|
             // Request the file contents of the Snapshot, and then store them.
-            context.core.snapshots.contents_for(&context.core.vfs, snapshot)
-              .then(move |files_content_res| match files_content_res {
-                Ok(files_content) => Ok(Snapshot::store_files_content(&context, &files_content)),
-                Err(e) => Err(throw(&e)),
-              }))
+            snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
+              .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+          )
           .to_boxed(),
       ]
     } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
@@ -765,7 +765,7 @@ impl From<ReadLink> for NodeKey {
 /// A Node that represents reading a file and fingerprinting its contents.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct DigestFile(File);
+pub struct DigestFile(pub File);
 
 impl Node for DigestFile {
   type Output = fs::Digest;
@@ -871,7 +871,7 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-  fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
+  fn create(context: Arc<Context>, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
     // Recursively expand PathGlobs into PathStats while tracking their dependencies.
     context
       .expand(path_globs)
@@ -889,10 +889,16 @@ impl Snapshot {
           // And then create a Snapshot.
           stats
             .and_then(move |_| {
-              context
-                .core
-                .snapshots
-                .create(&context.core.vfs, path_stats)
+              let context = context.clone();
+              let pool = context.core.pool.clone();
+              pool
+                .spawn_fn(move || {
+                  fs::Snapshot::from_path_stats(
+                    context.core.store.clone(),
+                    context.clone(),
+                    path_stats,
+                  )
+                })
                 .map_err(move |e| throw(&format!("Snapshot failed: {}", e)))
             })
             .to_boxed()
@@ -924,7 +930,7 @@ impl Snapshot {
     externs::invoke_unsafe(
       &context.core.types.construct_snapshot,
       &vec![
-        externs::store_bytes(&item.fingerprint.0),
+        externs::store_bytes(&(item.digest.0).0),
         externs::store_list(path_stats.iter().collect(), false),
       ],
     )
@@ -997,7 +1003,7 @@ impl Node for Snapshot {
       .then(move |path_globs_res| match path_globs_res {
         Ok(path_globs_val) => {
           match Self::lift_path_globs(&path_globs_val) {
-            Ok(pgs) => Snapshot::create(context, pgs),
+            Ok(pgs) => Snapshot::create(Arc::new(context), pgs),
             Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
           }
         }
